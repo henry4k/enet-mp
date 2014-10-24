@@ -13,6 +13,13 @@
 #include <enet/enet.h>
 
 
+typedef enum _ENetMpDisconnectReason
+{
+    ENET_MP_DISCONNECT_MANUAL,
+    ENET_MP_DISCONNECT_TIMEOUT,
+    ENET_MP_DISCONNECT_FORCED_BY_SERVER
+} ENetMpDisconnectReason;
+
 /**
  * Local server instance.
  *
@@ -32,6 +39,8 @@ typedef struct _ENetMpServerConfiguration
      */
     void* user_data;
 
+    // TODO address, channelcount, maxclients, throttling
+
     /**
      * Server name that is visible to the clients.
      */
@@ -42,13 +51,15 @@ typedef struct _ENetMpServerConfiguration
      *
      * Is not triggered when a clients tries connecting to a full server.
      */
-    void (*client_connecting)( ENetMpServer* server, int clientIndex );
+    void (*remote_client_connecting)( ENetMpServer* server, int remote_client_index );
 
     /**
      * Callback which is triggered when a client disconnected.
      */
-    void (*client_disconnected)( ENetMpServer* server, int clientIndex );
-} ENetMpServerCallbacks;
+    void (*remote_client_disconnected)( ENetMpServer* server,
+                                        int remote_client_index,
+                                        ENetMpDisconnectReason reason );
+} ENetMpServerConfiguration;
 
 /**
  * Local client instance.
@@ -60,17 +71,14 @@ typedef struct _ENetMpClient ENetMpClient;
 /**
  * Callbacks used by the client.
  */
-typedef struct _ENetMpClientCallbacks
+typedef struct _ENetMpClientConfiguration
 {
     /**
      * User data pointer which can be useful in callbacks.
      */
     void* user_data;
 
-    /**
-     * The host that shall be used as client.
-     */
-    ENetHost* host;
+    // TODO channelcount, throttling
 
     /**
      * Client name that is visible to the server and other clients.
@@ -79,12 +87,21 @@ typedef struct _ENetMpClientCallbacks
 
     /**
      * Callback which is triggered when the client disconnected from the server.
-     *
-     * @param reason
-     * A message
      */
-    void (*disconnected)( ENetMpClient* client, const char* reason );
-} ENetMpClientCallbacks;
+    void (*disconnected)( ENetMpClient* client, ENetMpDisconnectReason reason );
+
+    /**
+     * Callback which is triggered when another client connected to the server.
+     */
+    void (*remote_client_connected)( ENetMpClient* client, int remote_client_index );
+
+    /**
+     * Callback which is triggered when another client disconnected.
+     */
+    void (*remote_client_disconnected)( ENetMpClient* client,
+                                        int remote_client_index,
+                                        ENetMpDisconnectReason reason );
+} ENetMpClientConfiguration;
 
 
 /* ---- Server ---- */
@@ -114,6 +131,8 @@ void enet_mp_server_service( ENetMpServer* server, int timeframe );
 
 void* enet_mp_server_get_user_data( ENetMpServer* server );
 
+ENetHost* enet_mp_server_get_host( ENetMpServer* server );
+
 int enet_mp_server_get_remote_client_count( ENetMpServer* server );
 
 const char* enet_mp_server_get_remote_client_name( ENetMpServer* server, int index );
@@ -121,18 +140,12 @@ const char* enet_mp_server_get_remote_client_name( ENetMpServer* server, int ind
 ENetPeer* enet_mp_server_get_remote_client_peer( ENetMpServer* server, int index );
 
 /**
- * Queues a disconnect command for the given client.
+ * Forcefully disconnect a client.
  *
- * The command is sent and the client disconnected during the next call to
- * #enet_mp_server_service.
- *
- * @param reason
- * A message describing why the client has been disconnected.
- * May be `NULL` in which case no reason is provided to the client.
+ * Queues a disconnect command for the given client. The command is sent and
+ * the client disconnected during the next call to #enet_mp_server_service.
  */
-void enet_mp_server_disconnect_client( ENetMpServer* server,
-                                       int clientIndex,
-                                       const char* reason );
+void enet_mp_server_disconnect_client( ENetMpServer* server, int index );
 
 
 /* ---- Client ---- */
@@ -160,7 +173,9 @@ void enet_mp_client_destroy( ENetMpClient* client );
  */
 void enet_mp_client_service( ENetMpClient* client, int timeframe );
 
-void* enet_mp_client_get_user_data( ENetMpClient* server );
+void* enet_mp_client_get_user_data( ENetMpClient* client );
+
+ENetHost* enet_mp_client_get_host( ENetMpClient* client );
 
 const char* enet_mp_client_get_server_name( ENetMpClient* client );
 
