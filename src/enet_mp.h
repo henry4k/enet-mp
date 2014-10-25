@@ -39,7 +39,15 @@ typedef struct _ENetMpServerConfiguration
      */
     void* user_data;
 
-    // TODO address, channelcount, maxclients, throttling
+    /**
+     * Address under which the server will be available.
+     */
+    ENetAddress address;
+
+    /**
+     * Maximum clients that may be simultaneously connected.
+     */
+    int max_clients;
 
     /**
      * Server name that is visible to the clients.
@@ -78,7 +86,10 @@ typedef struct _ENetMpClientConfiguration
      */
     void* user_data;
 
-    // TODO channelcount, throttling
+    /**
+     * Address of the server you want to connect to.
+     */
+    ENetAddress address;
 
     /**
      * Client name that is visible to the server and other clients.
@@ -139,14 +150,6 @@ const char* enet_mp_server_get_remote_client_name( ENetMpServer* server, int ind
 
 ENetPeer* enet_mp_server_get_remote_client_peer( ENetMpServer* server, int index );
 
-/**
- * Forcefully disconnect a client.
- *
- * Queues a disconnect command for the given client. The command is sent and
- * the client disconnected during the next call to #enet_mp_server_service.
- */
-void enet_mp_server_disconnect_client( ENetMpServer* server, int index );
-
 
 /* ---- Client ---- */
 
@@ -178,6 +181,8 @@ void* enet_mp_client_get_user_data( ENetMpClient* client );
 ENetHost* enet_mp_client_get_host( ENetMpClient* client );
 
 const char* enet_mp_client_get_server_name( ENetMpClient* client );
+
+ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client );
 
 int enet_mp_client_get_remote_client_count( ENetMpClient* client );
 

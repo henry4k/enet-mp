@@ -34,16 +34,13 @@ int main()
     assert(enet_initialize());
     atexit(enet_deinitialize);
 
-    ENetHost* host = enet_host_create(NULL, // no address bound
-                                      1,  // we only need one connection
-                                      1,  // maximum channels
-                                      0,  // don't throttle incoming bandwidth
-                                      0); // don't throttle outgoing bandwidth
-    assert(host);
+    ENetAddress server_address;
+    assert(enet_address_set_host(&server_address, "localhost") == 0);
+    server_address.port = PORT;
 
     ENetMpClientConfiguration config;
     memset(&config, 0, sizeof(config));
-    config.host = host;
+    config.server_address = server_address;
     config.name = "example client";
     config.disconnected = disconnected;
     config.remote_client_connected = remote_client_connected;
@@ -60,6 +57,5 @@ int main()
     }
 
     enet_mp_client_destroy(client);
-    enet_host_destroy(host);
     return 0;
 }

@@ -29,20 +29,11 @@ int main()
     assert(enet_initialize());
     atexit(enet_deinitialize);
 
-    ENetAddress address;
-    address.host = ENET_HOST_ANY;
-    address.port = 1234;
-
-    ENetHost* host = enet_host_create(&address, // address to bind server to
-                                      32, // maximum connection count
-                                      1,  // maximum channels
-                                      0,  // don't throttle incoming bandwidth
-                                      0); // don't throttle outgoing bandwidth
-    assert(host);
-
     ENetMpServerConfiguration config;
     memset(&config, 0, sizeof(config));
-    config.host = host;
+    config.address.host = ENET_HOST_ANY;
+    config.address.port = PORT;
+    config.max_clients = 32;
     config.name = "example server";
     config.remote_client_connecting = remote_client_connecting;
     config.remote_client_disconnected = remote_client_disconnected;
@@ -58,6 +49,5 @@ int main()
     }
 
     enet_mp_server_destroy(server);
-    enet_host_destroy(host);
     return 0;
 }
