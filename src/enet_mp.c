@@ -10,13 +10,32 @@
 static const int MAX_NAME_SIZE = 64;
 
 
+typedef struct _ServerRemoteClient
+{
+    bool active;
+    void* user_data;
+    char name[MAX_NAME_SIZE];
+    ENetPeer* peer;
+
+} ServerRemoteClient;
+
+typedef struct _ClientRemoteClient
+{
+    bool active;
+    void* user_data;
+    char name[MAX_NAME_SIZE];
+
+} ClientRemoteClient;
+
 struct _ENetMpServer
 {
     void* user_data;
-    int max_clients;
     char name[MAX_NAME_SIZE];
     ENetMpServerCallbacks callbacks;
     ENetHost* host;
+    int user_channel_count;
+    int max_clients;
+    ServerRemoteClient* clients;
 };
 
 struct _ENetMpClient
@@ -25,9 +44,11 @@ struct _ENetMpClient
     char name[MAX_NAME_SIZE];
     ENetMpClientCallbacks callbacks;
     ENetHost* host;
-
+    int user_channel_count;
     char server_name[MAX_NAME_SIZE];
     ENetPeer* server_peer;
+    int max_clients;
+    ClientRemoteClient* clients;
 };
 
 typedef void (*EventHandler)( const ENetEvent* event );
@@ -67,28 +88,38 @@ static void host_service( ENetHost* host, int timeout, EventHandler event_handle
 ENetMpServer* enet_mp_server_create( const ENetMpServerConfiguration* config )
 {
     assert(config->max_clients >= 0);
+    assert(config->channel_count >= 0);
 
-    ENetMpServer* server = calloc(1, sizeof(ENetMpServer));
+    ENetMpServer* server = (ENetMpServer*)calloc(1, sizeof(ENetMpServer));
 
     server->user_data = config->user_data;
     server->max_clients = config->max_clients;
     bool r = copy_string(config->name, server->name, sizeof(server->name));
     assert(r);
     server->callbacks = config->callbacks;
+    server->user_channel_count = config->channel_count;
     server->host = enet_host_create(&config->address,
-                                    config->max_clients,
-                                    0, // unlimited channels (ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT)
+                                    server->max_clients,
+                                    server->user_channel_count,
                                     0, // unlimited ingoing bandwidth
                                     0); // unlimited outgoing bandwidth
     assert(server->host);
+    server->clients = (ServerRemoteClient*)calloc(config->max_clients, sizeof(ServerRemoteClient));
 
     return server;
 }
 
 void enet_mp_server_destroy( ENetMpServer* server )
 {
-    // TODO: Disconnect clients here!
+    for(int i = 0; i < server->max_clients; i++)
+    {
+        ServerRemoteClient* client = &server->clients[i];
+        if(client->active)
+            enet_peer_disconnect_now(client->peer, ENET_MP_DISCONNECT_MANUAL);
+    }
+
     enet_host_destroy(server->host);
+    free(server->clients);
     free(server);
 }
 
@@ -112,22 +143,39 @@ ENetHost* enet_mp_server_get_host( ENetMpServer* server )
     return server->host;
 }
 
-int enet_mp_server_get_remote_client_count( ENetMpServer* server )
+int enet_mp_server_max_remote_clients( ENetMpServer* server )
 {
-    UNIMPLEMENTED();
-    return 0;
+    return server->max_clients;
+}
+
+static ServerRemoteClient* server_get_remote_client( ENetMpServer* server, int index )
+{
+    assert(index >= 0);
+    if(index < server->max_clients)
+    {
+        ServerRemoteClient* remote_client = &server->clients[index];
+        if(remote_client->active)
+            return remote_client;
+    }
+    return NULL;
 }
 
 const char* enet_mp_server_get_remote_client_name( ENetMpServer* server, int index )
 {
-    UNIMPLEMENTED();
-    return NULL;
+    const ServerRemoteClient* remote_client = server_get_remote_client(server, index);
+    if(remote_client)
+        return remote_client->name;
+    else
+        return NULL;
 }
 
 ENetPeer* enet_mp_server_get_remote_client_peer( ENetMpServer* server, int index )
 {
-    UNIMPLEMENTED();
-    return NULL;
+    const ServerRemoteClient* remote_client = server_get_remote_client(server, index);
+    if(remote_client)
+        return remote_client->peer;
+    else
+        return NULL;
 }
 
 
@@ -135,28 +183,36 @@ ENetPeer* enet_mp_server_get_remote_client_peer( ENetMpServer* server, int index
 
 ENetMpClient* enet_mp_client_create( const ENetMpClientConfiguration* config )
 {
+    assert(config->channel_count >= 0);
+
     ENetMpClient* client = calloc(1, sizeof(ENetMpClient));
 
     client->user_data = config->user_data;
     bool r = copy_string(config->name, client->name, sizeof(client->name));
     assert(r);
     client->callbacks = config->callbacks;
+    client->user_channel_count = config->channel_count;
     client->host = enet_host_create(NULL, // do not bind the host to an address
                                     1, // at most one connection (the server)
-                                    0, // unlimited channels (ENET_PROTOCOL_MAXIMUM_CHANNEL_COUNT)
+                                    client->user_channel_count,
                                     0, // unlimited ingoing bandwidth
                                     0); // unlimited outgoing bandwidth
     assert(client->host);
 
-    // TODO: Connect to the server here!
+    client->server_peer = enet_host_connect(client->host,
+                                            &config->server_address,
+                                            client->user_channel_count,
+                                            0);
+    assert(client->server_peer);
 
     return client;
 }
 
 void enet_mp_client_destroy( ENetMpClient* client )
 {
-    // TODO: Disconnect from server here!
+    enet_peer_disconnect_now(client->server_peer, ENET_MP_DISCONNECT_MANUAL);
     enet_host_destroy(client->host);
+    free(client->clients);
     free(client);
 }
 
@@ -193,14 +249,28 @@ ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client )
     return client->server_peer;
 }
 
-int enet_mp_client_get_remote_client_count( ENetMpClient* client )
+int enet_mp_client_max_remote_clients( ENetMpClient* client )
 {
-    UNIMPLEMENTED();
-    return 0;
+    return client->max_clients;
+}
+
+static ClientRemoteClient* client_get_remote_client( ENetMpClient* client, int index )
+{
+    assert(index >= 0);
+    if(index < client->max_clients)
+    {
+        ClientRemoteClient* remote_client = &client->clients[index];
+        if(remote_client->active)
+            return remote_client;
+    }
+    return NULL;
 }
 
 const char* enet_mp_client_get_remote_client_name( ENetMpClient* client, int index )
 {
-    UNIMPLEMENTED();
-    return NULL;
+    const ClientRemoteClient* remote_client = client_get_remote_client(client, index);
+    if(remote_client)
+        return remote_client->name;
+    else
+        return NULL;
 }

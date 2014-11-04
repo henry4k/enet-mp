@@ -111,6 +111,11 @@ typedef struct _ENetMpServerConfiguration
     ENetAddress address;
 
     /**
+     * Amount of communication channels ENet shall provide.
+     */
+    int channel_count;
+
+    /**
      * Maximum clients that may be simultaneously connected.
      */
     int max_clients;
@@ -176,6 +181,11 @@ typedef struct _ENetMpClientConfiguration
     ENetAddress server_address;
 
     /**
+     * Amount of communication channels ENet shall provide.
+     */
+    int channel_count;
+
+    /**
      * Client name that is visible to the server and other clients.
      */
     const char* name;
@@ -214,7 +224,7 @@ ENET_MP_API void* enet_mp_server_get_user_data( ENetMpServer* server );
 
 ENET_MP_API ENetHost* enet_mp_server_get_host( ENetMpServer* server );
 
-ENET_MP_API int enet_mp_server_get_remote_client_count( ENetMpServer* server );
+ENET_MP_API int enet_mp_server_max_remote_clients( ENetMpServer* server );
 
 ENET_MP_API const char* enet_mp_server_get_remote_client_name( ENetMpServer* server, int index );
 
@@ -254,7 +264,7 @@ ENET_MP_API const char* enet_mp_client_get_server_name( ENetMpClient* client );
 
 ENET_MP_API ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client );
 
-ENET_MP_API int enet_mp_client_get_remote_client_count( ENetMpClient* client );
+ENET_MP_API int enet_mp_client_max_remote_clients( ENetMpClient* client );
 
 ENET_MP_API const char* enet_mp_client_get_remote_client_name( ENetMpClient* client, int index );
 
