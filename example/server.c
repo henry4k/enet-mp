@@ -38,7 +38,7 @@ void remote_client_sent_packet( ENetMpServer* server,
 
 int main()
 {
-    assert(enet_initialize());
+    assert(enet_initialize() == 0);
     atexit(enet_deinitialize);
 
     ENetMpServerConfiguration config;
@@ -47,20 +47,23 @@ int main()
     config.address.port = PORT;
     config.max_clients = 32;
     config.name = "example server";
-    config.remote_client_connecting = remote_client_connecting;
-    config.remote_client_disconnected = remote_client_disconnected;
-    config.remote_client_sent_packet = remote_client_sent_packet;
+    config.callbacks.remote_client_connecting = remote_client_connecting;
+    config.callbacks.remote_client_disconnected = remote_client_disconnected;
+    config.callbacks.remote_client_sent_packet = remote_client_sent_packet;
 
     ENetMpServer* server = enet_mp_server_create(&config);
     assert(server);
 
     signal(SIGTERM, stop);
+    signal(SIGINT, stop);
     while(is_running)
     {
         printf(".");
+        fflush(stdout);
         enet_mp_server_service(server, SERVICE_TIMEOUT);
     }
 
     enet_mp_server_destroy(server);
+    printf("\nstopped\n");
     return 0;
 }

@@ -2,7 +2,7 @@
 #define __EXAMPLE_SHARED_H__
 
 #include <assert.h>
-#include <stdio.h> // printf
+#include <stdio.h> // printf, fflush
 #include <string.h> // memset
 #include <stdlib.h> // atexit
 #include <signal.h>

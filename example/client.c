@@ -40,7 +40,7 @@ void received_packet( ENetMpClient* client,
 
 int main()
 {
-    assert(enet_initialize());
+    assert(enet_initialize() == 0);
     atexit(enet_deinitialize);
 
     ENetAddress server_address;
@@ -51,21 +51,24 @@ int main()
     memset(&config, 0, sizeof(config));
     config.server_address = server_address;
     config.name = "example client";
-    config.disconnected = disconnected;
-    config.remote_client_connected = remote_client_connected;
-    config.remote_client_disconnected = remote_client_disconnected;
-    config.received_packet = received_packet;
+    config.callbacks.disconnected = disconnected;
+    config.callbacks.remote_client_connected = remote_client_connected;
+    config.callbacks.remote_client_disconnected = remote_client_disconnected;
+    config.callbacks.received_packet = received_packet;
 
     ENetMpClient* client = enet_mp_client_create(&config);
     assert(client);
 
     signal(SIGTERM, stop);
+    signal(SIGINT, stop);
     while(is_running)
     {
         printf(".");
+        fflush(stdout);
         enet_mp_client_service(client, SERVICE_TIMEOUT);
     }
 
     enet_mp_client_destroy(client);
+    printf("\nstopped\n");
     return 0;
 }
