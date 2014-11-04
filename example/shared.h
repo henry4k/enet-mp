@@ -10,6 +10,6 @@
 #include <enet_mp.h>
 
 static const int PORT = 1234;
-static const int SERVICE_TIMEFRAME = 1000;
+static const int SERVICE_TIMEOUT = 1000;
 
 #endif

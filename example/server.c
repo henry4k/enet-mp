@@ -24,6 +24,18 @@ void remote_client_disconnected( ENetMpServer* server,
            reason);
 }
 
+void remote_client_sent_packet( ENetMpServer* server,
+                                int remote_client_index,
+                                int channel,
+                                ENetPacket* packet )
+{
+    printf("remote_client_sent_packet: index=%d name=%s channel=%d packet=%s",
+           remote_client_index,
+           enet_mp_server_get_remote_client_name(server, remote_client_index),
+           channel,
+           packet->data);
+}
+
 int main()
 {
     assert(enet_initialize());
@@ -37,6 +49,7 @@ int main()
     config.name = "example server";
     config.remote_client_connecting = remote_client_connecting;
     config.remote_client_disconnected = remote_client_disconnected;
+    config.remote_client_sent_packet = remote_client_sent_packet;
 
     ENetMpServer* server = enet_mp_server_create(&config);
     assert(server);
@@ -45,7 +58,7 @@ int main()
     while(is_running)
     {
         printf(".");
-        enet_mp_server_service(server, SERVICE_TIMEFRAME);
+        enet_mp_server_service(server, SERVICE_TIMEOUT);
     }
 
     enet_mp_server_destroy(server);

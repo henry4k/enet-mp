@@ -67,6 +67,17 @@ typedef struct _ENetMpServerConfiguration
     void (*remote_client_disconnected)( ENetMpServer* server,
                                         int remote_client_index,
                                         ENetMpDisconnectReason reason );
+
+    /**
+     * Callback which is triggered when the server received a packet from a client.
+     *
+     * The packet is destroyed after this call, so you don't need to destroy it
+     * yourself.
+     */
+    void (*remote_client_sent_packet)( ENetMpServer* server,
+                                       int remote_client_index,
+                                       int channel,
+                                       ENetPacket* packet );
 } ENetMpServerConfiguration;
 
 /**
@@ -89,7 +100,7 @@ typedef struct _ENetMpClientConfiguration
     /**
      * Address of the server you want to connect to.
      */
-    ENetAddress address;
+    ENetAddress server_address;
 
     /**
      * Client name that is visible to the server and other clients.
@@ -100,6 +111,14 @@ typedef struct _ENetMpClientConfiguration
      * Callback which is triggered when the client disconnected from the server.
      */
     void (*disconnected)( ENetMpClient* client, ENetMpDisconnectReason reason );
+
+    /**
+     * Callback which is triggered when the client received a packet from the server.
+     *
+     * The packet is destroyed after this call, so you don't need to destroy it
+     * yourself.
+     */
+    void (*received_packet)( ENetMpClient* client, int channel, ENetPacket* packet );
 
     /**
      * Callback which is triggered when another client connected to the server.
@@ -135,10 +154,10 @@ void enet_mp_server_destroy( ENetMpServer* server );
  *
  * Should be called regulary.
  *
- * @param timeframe
- * Call will block for `timeframe` milliseconds and wait for events.
+ * @param timeout
+ * Number of milliseconds that ENet should wait for events.
  */
-void enet_mp_server_service( ENetMpServer* server, int timeframe );
+void enet_mp_server_service( ENetMpServer* server, int timeout );
 
 void* enet_mp_server_get_user_data( ENetMpServer* server );
 
@@ -171,10 +190,10 @@ void enet_mp_client_destroy( ENetMpClient* client );
  *
  * Should be called regulary.
  *
- * @param timeframe
- * Call will block for `timeframe` milliseconds and wait for events.
+ * @param timeout
+ * Number of milliseconds that ENet should wait for events.
  */
-void enet_mp_client_service( ENetMpClient* client, int timeframe );
+void enet_mp_client_service( ENetMpClient* client, int timeout );
 
 void* enet_mp_client_get_user_data( ENetMpClient* client );
 

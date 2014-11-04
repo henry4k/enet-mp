@@ -7,16 +7,16 @@ void stop()
     is_running = 0;
 }
 
-void disconnected( ENetMpClient* client, const char* reason )
+void disconnected( ENetMpClient* client, ENetMpDisconnectReason reason )
 {
-    printf("disconnected: reason=%s", reason);
+    printf("disconnected: reason=%d", reason);
 }
 
 void remote_client_connected( ENetMpClient* client, int remote_client_index )
 {
     printf("remote_client_connected: index=%d name=%s\n",
            remote_client_index,
-           enet_mp_client_get_remote_client_name(server, remote_client_index));
+           enet_mp_client_get_remote_client_name(client, remote_client_index));
 }
 
 void remote_client_disconnected( ENetMpClient* client,
@@ -25,8 +25,17 @@ void remote_client_disconnected( ENetMpClient* client,
 {
     printf("remote_client_disconnected: index=%d name=%s reason=%d\n",
            remote_client_index,
-           enet_mp_client_get_remote_client_name(server, remote_client_index),
+           enet_mp_client_get_remote_client_name(client, remote_client_index),
            reason);
+}
+
+void received_packet( ENetMpClient* client,
+                      int channel,
+                      ENetPacket* packet )
+{
+    printf("received_packet: channel=%d packet=%s",
+           channel,
+           packet->data);
 }
 
 int main()
@@ -45,6 +54,7 @@ int main()
     config.disconnected = disconnected;
     config.remote_client_connected = remote_client_connected;
     config.remote_client_disconnected = remote_client_disconnected;
+    config.received_packet = received_packet;
 
     ENetMpClient* client = enet_mp_client_create(&config);
     assert(client);
@@ -53,7 +63,7 @@ int main()
     while(is_running)
     {
         printf(".");
-        enet_mp_client_service(client, SERVICE_TIMEFRAME);
+        enet_mp_client_service(client, SERVICE_TIMEOUT);
     }
 
     enet_mp_client_destroy(client);
