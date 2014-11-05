@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <stdio.h> // DEBGUG
 #include <stdlib.h> // calloc, free
 #include <string.h> // memset, strlen, strncpy
 #include "enet_mp.h"
@@ -8,6 +9,12 @@
 #define UNIMPLEMENTED() assert(!"UNIMPLEMENTED!")
 
 static const int MAX_NAME_SIZE = 64;
+
+enum ConnectionType
+{
+    QUERY_CONNECTION,
+    CLIENT_CONNECTION
+};
 
 
 typedef struct _ServerRemoteClient
@@ -51,7 +58,7 @@ struct _ENetMpClient
     ClientRemoteClient* clients;
 };
 
-typedef void (*EventHandler)( const ENetEvent* event );
+typedef void (*EventHandler)( void* context, const ENetEvent* event );
 
 
 
@@ -72,13 +79,16 @@ static bool copy_string( const char* source, char* destination, int destination_
     }
 }
 
-static void host_service( ENetHost* host, int timeout, EventHandler event_handler )
+static void host_service( ENetHost* host,
+                          int timeout,
+                          EventHandler event_handler,
+                          void* context )
 {
     ENetEvent event;
     int event_occured = enet_host_service(host, &event, timeout);
     assert(event_occured >= 0);
     if(event_occured > 0)
-        event_handler(&event);
+        event_handler(context, &event);
     // TODO: Maybe use enet_host_check_events and enet_host_flush instead.
 }
 
@@ -123,14 +133,49 @@ void enet_mp_server_destroy( ENetMpServer* server )
     free(server);
 }
 
-static void server_event_handler( const ENetEvent* event )
+static void server_event_handler( void* context, const ENetEvent* event )
 {
-    UNIMPLEMENTED();
+    ENetMpServer* server = (ENetMpServer*)context;
+
+    switch(event->type)
+    {
+        case ENET_EVENT_TYPE_CONNECT:
+            printf("ENET_EVENT_TYPE_CONNECT\n");
+            const int connectionType = event->data;
+            switch(connectionType)
+            {
+                case QUERY_CONNECTION:
+                    enet_peer_disconnect_now(event->peer,
+                                             ENET_MP_DISCONNECT_FORCED_BY_SERVER);
+                    UNIMPLEMENTED();
+                    break;
+
+                case CLIENT_CONNECTION:
+                    break;
+
+                default:
+                    enet_peer_disconnect_now(event->peer,
+                                             ENET_MP_DISCONNECT_FORCED_BY_SERVER);
+                    assert(!"Unknown connection type!");
+            }
+            break;
+
+        case ENET_EVENT_TYPE_DISCONNECT:
+            printf("ENET_EVENT_TYPE_DISCONNECT\n");
+            break;
+
+        case ENET_EVENT_TYPE_RECEIVE:
+            printf("ENET_EVENT_TYPE_RECEIVE\n");
+            break;
+
+        default:
+            assert(!"Unknown event!");
+    }
 }
 
 void enet_mp_server_service( ENetMpServer* server, int timeout )
 {
-    host_service(server->host, timeout, server_event_handler);
+    host_service(server->host, timeout, server_event_handler, server);
 }
 
 void* enet_mp_server_get_user_data( ENetMpServer* server )
@@ -202,7 +247,7 @@ ENetMpClient* enet_mp_client_create( const ENetMpClientConfiguration* config )
     client->server_peer = enet_host_connect(client->host,
                                             &config->server_address,
                                             client->user_channel_count,
-                                            0);
+                                            CLIENT_CONNECTION);
     assert(client->server_peer);
 
     return client;
@@ -216,14 +261,34 @@ void enet_mp_client_destroy( ENetMpClient* client )
     free(client);
 }
 
-static void client_event_handler( const ENetEvent* event )
+static void client_event_handler( void* context, const ENetEvent* event )
 {
-    UNIMPLEMENTED();
+    ENetMpClient* client = (ENetMpClient*)context;
+
+    switch(event->type)
+    {
+        case ENET_EVENT_TYPE_CONNECT:
+            printf("ENET_EVENT_TYPE_CONNECT\n");
+            assert(event->peer == client->server_peer);
+            break;
+
+        case ENET_EVENT_TYPE_DISCONNECT:
+            printf("ENET_EVENT_TYPE_DISCONNECT\n");
+            assert(event->peer == client->server_peer);
+            break;
+
+        case ENET_EVENT_TYPE_RECEIVE:
+            printf("ENET_EVENT_TYPE_RECEIVE\n");
+            break;
+
+        default:
+            assert(!"Unknown event!");
+    }
 }
 
 void enet_mp_client_service( ENetMpClient* client, int timeout )
 {
-    host_service(client->host, timeout, client_event_handler);
+    host_service(client->host, timeout, client_event_handler, client);
 }
 
 void* enet_mp_client_get_user_data( ENetMpClient* client )
