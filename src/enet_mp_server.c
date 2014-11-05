@@ -1,17 +1,27 @@
 #include <assert.h>
 #include <stdlib.h> // calloc, free
+#include <string.h> // memset
 #include "enet_mp.h"
 #include "enet_mp_shared.h"
 
 
-typedef struct _ServerRemoteClient
+typedef enum _ClientSlotState
 {
-    bool active;
+    CLIENT_SLOT_UNUSED,
+    CLIENT_SLOT_CONNECTED
+    // ...
+} ClientSlotState;
+
+typedef struct _ClientSlot
+{
+    ClientSlotState state;
     void* user_data;
     char name[MAX_NAME_SIZE];
     ENetPeer* peer;
+    enet_uint32 reply_time; // Client will be disconnected if it has not
+                            // replied before reply_timeout.
 
-} ServerRemoteClient;
+} ClientSlot;
 
 struct _ENetMpServer
 {
@@ -20,8 +30,9 @@ struct _ENetMpServer
     ENetMpServerCallbacks callbacks;
     ENetHost* host;
     int user_channel_count;
-    int max_clients;
-    ServerRemoteClient* clients;
+    int client_slot_count;
+    ClientSlot* client_slots;
+    enet_uint32 reply_timeout;
 };
 
 
@@ -33,79 +44,192 @@ ENetMpServer* enet_mp_server_create( const ENetMpServerConfiguration* config )
     ENetMpServer* server = (ENetMpServer*)calloc(1, sizeof(ENetMpServer));
 
     server->user_data = config->user_data;
-    server->max_clients = config->max_clients;
+    server->client_slot_count = config->max_clients;
     bool r = copy_string(config->name, server->name, sizeof(server->name));
     assert(r);
     server->callbacks = config->callbacks;
     server->user_channel_count = config->channel_count;
     server->host = enet_host_create(&config->address,
-                                    server->max_clients,
-                                    server->user_channel_count,
+                                    server->client_slot_count,
+                                    server->user_channel_count + INTERNAL_CHANNEL_COUNT,
                                     0, // unlimited ingoing bandwidth
                                     0); // unlimited outgoing bandwidth
     assert(server->host);
-    server->clients = (ServerRemoteClient*)calloc(config->max_clients, sizeof(ServerRemoteClient));
+    server->client_slots = (ClientSlot*)calloc(server->client_slot_count,
+                                               sizeof(ClientSlot));
+    server->reply_timeout = 1000;
 
     return server;
 }
 
+static void disconnect_client_later( ENetMpServer* server, ClientSlot* slot, int reason )
+{
+    assert(slot->state != CLIENT_SLOT_UNUSED);
+    enet_peer_disconnect_later(slot->peer, reason);
+}
+
+static void disconnect_client_now( ENetMpServer* server, ClientSlot* slot, int reason )
+{
+    assert(slot->state != CLIENT_SLOT_UNUSED);
+    enet_peer_disconnect_now(slot->peer, reason);
+    slot->state = CLIENT_SLOT_UNUSED;
+}
+
 void enet_mp_server_destroy( ENetMpServer* server )
 {
-    for(int i = 0; i < server->max_clients; i++)
+    for(int i = 0; i < server->client_slot_count; i++)
     {
-        ServerRemoteClient* client = &server->clients[i];
-        if(client->active)
-            enet_peer_disconnect_now(client->peer, ENET_MP_DISCONNECT_MANUAL);
+        ClientSlot* slot = &server->client_slots[i];
+        if(slot->state != CLIENT_SLOT_UNUSED)
+            disconnect_client_now(server, slot, ENET_MP_DISCONNECT_SERVER_SHUTDOWN);
     }
 
     enet_host_destroy(server->host);
-    free(server->clients);
+    free(server->client_slots);
     free(server);
 }
 
-static void server_event_handler( void* context, const ENetEvent* event )
+static ClientSlot* find_unused_client_slot( ENetMpServer* server )
+{
+    for(int i = 0; i < server->client_slot_count; i++)
+    {
+        ClientSlot* slot = &server->client_slots[i];
+        if(slot->state == CLIENT_SLOT_UNUSED)
+            return slot;
+    }
+    return NULL;
+}
+
+static void handle_query( const ENetMpServer* server, ENetPeer* peer )
+{
+    enet_peer_disconnect_now(peer, ENET_MP_DISCONNECT_UNKNOWN);
+    UNIMPLEMENTED();
+}
+
+static void handle_new_client( ENetMpServer* server, ENetPeer* peer )
+{
+    ClientSlot* slot = find_unused_client_slot(server);
+    if(slot)
+    {
+        memset(slot, 0, sizeof(ClientSlot));
+        slot->state = CLIENT_SLOT_CONNECTED;
+        slot->peer = peer;
+        slot->reply_time = enet_time_get() + server->reply_timeout;
+    }
+    else
+    {
+        enet_peer_disconnect_now(peer, ENET_MP_DISCONNECT_SERVER_FULL);
+        UNIMPLEMENTED();
+    }
+}
+
+static void handle_unknown_connection( const ENetMpServer* server, ENetPeer* peer )
+{
+    enet_peer_disconnect_now(peer, ENET_MP_DISCONNECT_UNKNOWN);
+    assert(!"Unknown connection type!");
+}
+
+static int find_client_slot_by_peer( const ENetMpServer* server, const ENetPeer* peer )
+{
+    for(int i = 0; i < server->client_slot_count; i++)
+    {
+        ClientSlot* slot = &server->client_slots[i];
+        if(slot->peer == peer)
+        {
+            assert(slot->state != CLIENT_SLOT_UNUSED);
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void handle_connect( void* context,
+                            ENetPeer* peer,
+                            ConnectionType connection_type )
 {
     ENetMpServer* server = (ENetMpServer*)context;
 
-    switch(event->type)
+    switch(connection_type)
     {
-        case ENET_EVENT_TYPE_CONNECT:
-            printf("ENET_EVENT_TYPE_CONNECT\n");
-            const int connectionType = event->data;
-            switch(connectionType)
-            {
-                case QUERY_CONNECTION:
-                    enet_peer_disconnect_now(event->peer,
-                                             ENET_MP_DISCONNECT_FORCED_BY_SERVER);
-                    UNIMPLEMENTED();
-                    break;
-
-                case CLIENT_CONNECTION:
-                    break;
-
-                default:
-                    enet_peer_disconnect_now(event->peer,
-                                             ENET_MP_DISCONNECT_FORCED_BY_SERVER);
-                    assert(!"Unknown connection type!");
-            }
+        case QUERY_CONNECTION:
+            handle_query(server, peer);
             break;
 
-        case ENET_EVENT_TYPE_DISCONNECT:
-            printf("ENET_EVENT_TYPE_DISCONNECT\n");
-            break;
-
-        case ENET_EVENT_TYPE_RECEIVE:
-            printf("ENET_EVENT_TYPE_RECEIVE\n");
+        case CLIENT_CONNECTION:
+            handle_new_client(server, peer);
             break;
 
         default:
-            assert(!"Unknown event!");
+            handle_unknown_connection(server, peer);
+    }
+}
+
+static void handle_disconnect( void* context,
+                               ENetPeer* peer,
+                               ENetMpDisconnectReason reason )
+{
+    ENetMpServer* server = (ENetMpServer*)context;
+
+    const int slot_index = find_client_slot_by_peer(server, peer);
+    if(slot_index >= 0)
+    {
+        ClientSlot* slot = &server->client_slots[slot_index];
+        slot->state = CLIENT_SLOT_UNUSED;
+        server->callbacks.client_disconnected(server, slot_index, reason);
+    }
+}
+
+static void handle_receive( void* context,
+                            ENetPeer* peer,
+                            int channel,
+                            const ENetPacket* packet )
+{
+    ENetMpServer* server = (ENetMpServer*)context;
+    const int slot_index = find_client_slot_by_peer(server, peer);
+
+    const int user_channel_count = server->user_channel_count;
+    if(channel < user_channel_count)
+    {
+        assert(slot_index >= 0);
+        server->callbacks.client_sent_packet(server, slot_index, channel, packet);
+    }
+    else
+    {
+        const InternalChannel internal_channel =
+            (InternalChannel)(channel-user_channel_count);
+
+        switch(internal_channel)
+        {
+            case MP_COMMAND_CHANNEL:
+                UNIMPLEMENTED();
+                break;
+
+            default:
+                assert(!"Unknown internal channel!");
+        }
+    }
+}
+
+static void disconnect_clients_with_reply_timeout( ENetMpServer* server )
+{
+    for(int i = 0; i < server->client_slot_count; i++)
+    {
+        ClientSlot* slot = &server->client_slots[i];
+        if(slot->state != CLIENT_SLOT_UNUSED &&
+           slot->reply_time != 0 &&
+           enet_time_get() > slot->reply_time)
+        {
+            disconnect_client_later(server, slot, ENET_MP_DISCONNECT_REPLY_TIMEOUT);
+        }
     }
 }
 
 void enet_mp_server_service( ENetMpServer* server, int timeout )
 {
-    host_service(server->host, timeout, server_event_handler, server);
+    host_service(server->host, timeout, server, handle_connect,
+                                                handle_disconnect,
+                                                handle_receive);
+    disconnect_clients_with_reply_timeout(server);
 }
 
 void* enet_mp_server_get_user_data( ENetMpServer* server )
@@ -118,37 +242,37 @@ ENetHost* enet_mp_server_get_host( ENetMpServer* server )
     return server->host;
 }
 
-int enet_mp_server_max_remote_clients( ENetMpServer* server )
+int enet_mp_server_get_client_slot_count( ENetMpServer* server )
 {
-    return server->max_clients;
+    return server->client_slot_count;
 }
 
-static ServerRemoteClient* server_get_remote_client( ENetMpServer* server, int index )
+static ClientSlot* get_client_slot( ENetMpServer* server, int index )
 {
     assert(index >= 0);
-    if(index < server->max_clients)
+    if(index < server->client_slot_count)
     {
-        ServerRemoteClient* remote_client = &server->clients[index];
-        if(remote_client->active)
-            return remote_client;
+        ClientSlot* slot = &server->client_slots[index];
+        if(slot->state != CLIENT_SLOT_UNUSED)
+            return slot;
     }
     return NULL;
 }
 
-const char* enet_mp_server_get_remote_client_name( ENetMpServer* server, int index )
+const char* enet_mp_server_get_client_name_at_slot( ENetMpServer* server, int index )
 {
-    const ServerRemoteClient* remote_client = server_get_remote_client(server, index);
-    if(remote_client)
-        return remote_client->name;
+    const ClientSlot* slot = get_client_slot(server, index);
+    if(slot)
+        return slot->name;
     else
         return NULL;
 }
 
-ENetPeer* enet_mp_server_get_remote_client_peer( ENetMpServer* server, int index )
+ENetPeer* enet_mp_server_get_client_peer_at_slot( ENetMpServer* server, int index )
 {
-    const ServerRemoteClient* remote_client = server_get_remote_client(server, index);
-    if(remote_client)
-        return remote_client->peer;
+    const ClientSlot* slot = get_client_slot(server, index);
+    if(slot)
+        return slot->peer;
     else
         return NULL;
 }

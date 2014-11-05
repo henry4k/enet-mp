@@ -52,9 +52,11 @@ extern "C"
 
 typedef enum _ENetMpDisconnectReason
 {
+    ENET_MP_DISCONNECT_UNKNOWN,
     ENET_MP_DISCONNECT_MANUAL,
-    ENET_MP_DISCONNECT_TIMEOUT,
-    ENET_MP_DISCONNECT_FORCED_BY_SERVER
+    ENET_MP_DISCONNECT_SERVER_SHUTDOWN,
+    ENET_MP_DISCONNECT_SERVER_FULL,
+    ENET_MP_DISCONNECT_REPLY_TIMEOUT,
 } ENetMpDisconnectReason;
 
 /**
@@ -71,14 +73,14 @@ typedef struct _ENetMpServerCallbacks
      *
      * Is not triggered when a clients tries connecting to a full server.
      */
-    void (*remote_client_connecting)( ENetMpServer* server, int remote_client_index );
+    void (*client_connecting)( ENetMpServer* server, int client_slot_index );
 
     /**
      * Callback which is triggered when a client disconnected.
      */
-    void (*remote_client_disconnected)( ENetMpServer* server,
-                                        int remote_client_index,
-                                        ENetMpDisconnectReason reason );
+    void (*client_disconnected)( ENetMpServer* server,
+                                 int client_slot_index,
+                                 ENetMpDisconnectReason reason );
 
     /**
      * Callback which is triggered when the server received a packet from a client.
@@ -86,10 +88,10 @@ typedef struct _ENetMpServerCallbacks
      * The packet is destroyed after this call, so you don't need to destroy it
      * yourself.
      */
-    void (*remote_client_sent_packet)( ENetMpServer* server,
-                                       int remote_client_index,
-                                       int channel,
-                                       ENetPacket* packet );
+    void (*client_sent_packet)( ENetMpServer* server,
+                                int client_slot_index,
+                                int channel,
+                                const ENetPacket* packet );
 
 } ENetMpServerCallbacks;
 
@@ -149,19 +151,19 @@ typedef struct _ENetMpClientCallbacks
      * The packet is destroyed after this call, so you don't need to destroy it
      * yourself.
      */
-    void (*received_packet)( ENetMpClient* client, int channel, ENetPacket* packet );
+    void (*received_packet)( ENetMpClient* client, int channel, const ENetPacket* packet );
 
     /**
      * Callback which is triggered when another client connected to the server.
      */
-    void (*remote_client_connected)( ENetMpClient* client, int remote_client_index );
+    void (*another_client_connected)( ENetMpClient* client, int client_slot_index );
 
     /**
      * Callback which is triggered when another client disconnected.
      */
-    void (*remote_client_disconnected)( ENetMpClient* client,
-                                        int remote_client_index,
-                                        ENetMpDisconnectReason reason );
+    void (*another_client_disconnected)( ENetMpClient* client,
+                                         int client_slot_index,
+                                         ENetMpDisconnectReason reason );
 
 } ENetMpClientCallbacks;
 
@@ -224,11 +226,11 @@ ENET_MP_API void* enet_mp_server_get_user_data( ENetMpServer* server );
 
 ENET_MP_API ENetHost* enet_mp_server_get_host( ENetMpServer* server );
 
-ENET_MP_API int enet_mp_server_max_remote_clients( ENetMpServer* server );
+ENET_MP_API int enet_mp_server_get_client_slot_count( ENetMpServer* server );
 
-ENET_MP_API const char* enet_mp_server_get_remote_client_name( ENetMpServer* server, int index );
+ENET_MP_API const char* enet_mp_server_get_client_name_at_slot( ENetMpServer* server, int index );
 
-ENET_MP_API ENetPeer* enet_mp_server_get_remote_client_peer( ENetMpServer* server, int index );
+ENET_MP_API ENetPeer* enet_mp_server_get_client_peer_at_slot( ENetMpServer* server, int index );
 
 
 /* ---- Client ---- */
@@ -264,9 +266,9 @@ ENET_MP_API const char* enet_mp_client_get_server_name( ENetMpClient* client );
 
 ENET_MP_API ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client );
 
-ENET_MP_API int enet_mp_client_max_remote_clients( ENetMpClient* client );
+ENET_MP_API int enet_mp_client_get_client_slot_count( ENetMpClient* client );
 
-ENET_MP_API const char* enet_mp_client_get_remote_client_name( ENetMpClient* client, int index );
+ENET_MP_API const char* enet_mp_client_get_client_name_at_slot( ENetMpClient* client, int index );
 
 
 #ifdef __cplusplus

@@ -9,19 +9,38 @@
 
 static const int MAX_NAME_SIZE = 64;
 
-enum ConnectionType
+typedef enum _ConnectionType
 {
     QUERY_CONNECTION,
     CLIENT_CONNECTION
-};
 
-typedef void (*EventHandler)( void* context, const ENetEvent* event );
+} ConnectionType;
+
+typedef enum _InternalChannel
+{
+    MP_COMMAND_CHANNEL,
+    INTERNAL_CHANNEL_COUNT
+
+} InternalChannel;
+
+typedef void (*ConnectHandler)( void* context,
+                                ENetPeer* peer,
+                                ConnectionType connection_type );
+typedef void (*DisconnectHandler)( void* context,
+                                   ENetPeer* peer,
+                                   ENetMpDisconnectReason reason );
+typedef void (*ReceiveHandler)( void* context,
+                                ENetPeer* peer,
+                                int channel,
+                                const ENetPacket* packet );
 
 
 bool copy_string( const char* source, char* destination, int destination_size );
 void host_service( ENetHost* host,
                    int timeout,
-                   EventHandler event_handler,
-                   void* context );
+                   void* context,
+                   ConnectHandler connect_handler,
+                   DisconnectHandler disconnect_handler,
+                   ReceiveHandler receive_handler );
 
 #endif

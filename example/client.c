@@ -10,28 +10,29 @@ void stop()
 void disconnected( ENetMpClient* client, ENetMpDisconnectReason reason )
 {
     printf("disconnected: reason=%d", reason);
+    stop();
 }
 
-void remote_client_connected( ENetMpClient* client, int remote_client_index )
+void another_client_connected( ENetMpClient* client, int client_slot_index )
 {
     printf("remote_client_connected: index=%d name=%s\n",
-           remote_client_index,
-           enet_mp_client_get_remote_client_name(client, remote_client_index));
+           client_slot_index,
+           enet_mp_client_get_client_name_at_slot(client, client_slot_index));
 }
 
-void remote_client_disconnected( ENetMpClient* client,
-                                 int remote_client_index,
+void another_client_disconnected( ENetMpClient* client,
+                                 int client_slot_index,
                                  ENetMpDisconnectReason reason )
 {
     printf("remote_client_disconnected: index=%d name=%s reason=%d\n",
-           remote_client_index,
-           enet_mp_client_get_remote_client_name(client, remote_client_index),
+           client_slot_index,
+           enet_mp_client_get_client_name_at_slot(client, client_slot_index),
            reason);
 }
 
 void received_packet( ENetMpClient* client,
                       int channel,
-                      ENetPacket* packet )
+                      const ENetPacket* packet )
 {
     printf("received_packet: channel=%d packet=%s",
            channel,
@@ -52,8 +53,8 @@ int main()
     config.server_address = server_address;
     config.name = "example client";
     config.callbacks.disconnected = disconnected;
-    config.callbacks.remote_client_connected = remote_client_connected;
-    config.callbacks.remote_client_disconnected = remote_client_disconnected;
+    config.callbacks.another_client_connected = another_client_connected;
+    config.callbacks.another_client_disconnected = another_client_disconnected;
     config.callbacks.received_packet = received_packet;
 
     ENetMpClient* client = enet_mp_client_create(&config);

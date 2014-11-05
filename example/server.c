@@ -7,31 +7,31 @@ void stop()
     is_running = 0;
 }
 
-void remote_client_connecting( ENetMpServer* server, int remote_client_index )
+void client_connecting( ENetMpServer* server, int client_slot_index )
 {
-    printf("remote_client_connecting: index=%d name=%s\n",
-           remote_client_index,
-           enet_mp_server_get_remote_client_name(server, remote_client_index));
+    printf("client_connecting: index=%d name=%s\n",
+           client_slot_index,
+           enet_mp_server_get_client_name_at_slot(server, client_slot_index));
 }
 
-void remote_client_disconnected( ENetMpServer* server,
-                                 int remote_client_index,
-                                 ENetMpDisconnectReason reason )
+void client_disconnected( ENetMpServer* server,
+                          int client_slot_index,
+                          ENetMpDisconnectReason reason )
 {
-    printf("remote_client_disconnected: index=%d name=%s reason=%d\n",
-           remote_client_index,
-           enet_mp_server_get_remote_client_name(server, remote_client_index),
+    printf("client_disconnected: index=%d name=%s reason=%d\n",
+           client_slot_index,
+           enet_mp_server_get_client_name_at_slot(server, client_slot_index),
            reason);
 }
 
-void remote_client_sent_packet( ENetMpServer* server,
-                                int remote_client_index,
-                                int channel,
-                                ENetPacket* packet )
+void client_sent_packet( ENetMpServer* server,
+                         int client_slot_index,
+                         int channel,
+                         const ENetPacket* packet )
 {
-    printf("remote_client_sent_packet: index=%d name=%s channel=%d packet=%s",
-           remote_client_index,
-           enet_mp_server_get_remote_client_name(server, remote_client_index),
+    printf("client_sent_packet: index=%d name=%s channel=%d packet=%s",
+           client_slot_index,
+           enet_mp_server_get_client_name_at_slot(server, client_slot_index),
            channel,
            packet->data);
 }
@@ -47,9 +47,9 @@ int main()
     config.address.port = PORT;
     config.max_clients = 32;
     config.name = "example server";
-    config.callbacks.remote_client_connecting = remote_client_connecting;
-    config.callbacks.remote_client_disconnected = remote_client_disconnected;
-    config.callbacks.remote_client_sent_packet = remote_client_sent_packet;
+    config.callbacks.client_connecting = client_connecting;
+    config.callbacks.client_disconnected = client_disconnected;
+    config.callbacks.client_sent_packet = client_sent_packet;
 
     ENetMpServer* server = enet_mp_server_create(&config);
     assert(server);

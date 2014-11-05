@@ -4,13 +4,13 @@
 #include "enet_mp_shared.h"
 
 
-typedef struct _ClientRemoteClient
+typedef struct _ClientSlot
 {
     bool active;
     void* user_data;
     char name[MAX_NAME_SIZE];
 
-} ClientRemoteClient;
+} ClientSlot;
 
 struct _ENetMpClient
 {
@@ -21,8 +21,8 @@ struct _ENetMpClient
     int user_channel_count;
     char server_name[MAX_NAME_SIZE];
     ENetPeer* server_peer;
-    int max_clients;
-    ClientRemoteClient* clients;
+    int client_slot_count;
+    ClientSlot* client_slots;
 };
 
 
@@ -57,38 +57,61 @@ void enet_mp_client_destroy( ENetMpClient* client )
 {
     enet_peer_disconnect_now(client->server_peer, ENET_MP_DISCONNECT_MANUAL);
     enet_host_destroy(client->host);
-    free(client->clients);
+    free(client->client_slots);
     free(client);
 }
 
-static void client_event_handler( void* context, const ENetEvent* event )
+static void handle_connect( void* context,
+                            ENetPeer* peer,
+                            ConnectionType connection_type )
+{
+    ENetMpClient* client = (ENetMpClient*)context;
+    assert(peer == client->server_peer);
+}
+
+static void handle_disconnect( void* context,
+                               ENetPeer* peer,
+                               ENetMpDisconnectReason reason )
+{
+    ENetMpClient* client = (ENetMpClient*)context;
+    assert(peer == client->server_peer);
+    client->callbacks.disconnected(client, reason);
+}
+
+static void handle_receive( void* context,
+                            ENetPeer* peer,
+                            int channel,
+                            const ENetPacket* packet )
 {
     ENetMpClient* client = (ENetMpClient*)context;
 
-    switch(event->type)
+    const int user_channel_count = client->user_channel_count;
+    if(channel < user_channel_count)
     {
-        case ENET_EVENT_TYPE_CONNECT:
-            printf("ENET_EVENT_TYPE_CONNECT\n");
-            assert(event->peer == client->server_peer);
-            break;
+        client->callbacks.received_packet(client, channel, packet);
+    }
+    else
+    {
+        const InternalChannel internal_channel =
+            (InternalChannel)(channel-user_channel_count);
 
-        case ENET_EVENT_TYPE_DISCONNECT:
-            printf("ENET_EVENT_TYPE_DISCONNECT\n");
-            assert(event->peer == client->server_peer);
-            break;
+        switch(internal_channel)
+        {
+            case MP_COMMAND_CHANNEL:
+                UNIMPLEMENTED();
+                break;
 
-        case ENET_EVENT_TYPE_RECEIVE:
-            printf("ENET_EVENT_TYPE_RECEIVE\n");
-            break;
-
-        default:
-            assert(!"Unknown event!");
+            default:
+                assert(!"Unknown internal channel!");
+        }
     }
 }
 
 void enet_mp_client_service( ENetMpClient* client, int timeout )
 {
-    host_service(client->host, timeout, client_event_handler, client);
+    host_service(client->host, timeout, client, handle_connect,
+                                                handle_disconnect,
+                                                handle_receive);
 }
 
 void* enet_mp_client_get_user_data( ENetMpClient* client )
@@ -114,28 +137,28 @@ ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client )
     return client->server_peer;
 }
 
-int enet_mp_client_max_remote_clients( ENetMpClient* client )
+int enet_mp_client_get_client_slot_count( ENetMpClient* client )
 {
-    return client->max_clients;
+    return client->client_slot_count;
 }
 
-static ClientRemoteClient* client_get_remote_client( ENetMpClient* client, int index )
+static ClientSlot* get_client_slot( ENetMpClient* client, int index )
 {
     assert(index >= 0);
-    if(index < client->max_clients)
+    if(index < client->client_slot_count)
     {
-        ClientRemoteClient* remote_client = &client->clients[index];
-        if(remote_client->active)
-            return remote_client;
+        ClientSlot* slot = &client->client_slots[index];
+        if(slot->active)
+            return slot;
     }
     return NULL;
 }
 
-const char* enet_mp_client_get_remote_client_name( ENetMpClient* client, int index )
+const char* enet_mp_client_get_client_name_at_slot( ENetMpClient* client, int index )
 {
-    const ClientRemoteClient* remote_client = client_get_remote_client(client, index);
-    if(remote_client)
-        return remote_client->name;
+    const ClientSlot* slot = get_client_slot(client, index);
+    if(slot)
+        return slot->name;
     else
         return NULL;
 }
