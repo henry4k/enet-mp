@@ -97,7 +97,7 @@ static void handle_receive( void* context,
 
         switch(internal_channel)
         {
-            case MP_COMMAND_CHANNEL:
+            case MESSAGE_CHANNEL:
                 UNIMPLEMENTED();
                 break;
 
