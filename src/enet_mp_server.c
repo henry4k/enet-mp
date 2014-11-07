@@ -118,7 +118,9 @@ static void handle_new_client( ENetMpServer* server, ENetPeer* peer )
     ClientSlot* slot = find_unused_client_slot(server);
     if(slot)
     {
+        const int index = slot->index;
         memset(slot, 0, sizeof(ClientSlot));
+        slot->index = index;
         slot->state = CLIENT_SLOT_CONNECTING;
         slot->peer = peer;
         slot->reply_time = enet_time_get() + server->reply_timeout;
