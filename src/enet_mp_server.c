@@ -200,15 +200,66 @@ static void handle_disconnect( void* context,
     }
 }
 
+static int get_used_client_slot_count( const ENetMpServer* server )
+{
+    int count = 0;
+    for(int i = 0; i < server->client_slot_count; i++)
+    {
+        ClientSlot* slot = &server->client_slots[i];
+        if(slot->state != CLIENT_SLOT_UNUSED)
+            count++;
+    }
+    return count;
+}
+
+static void send_login_response( ENetMpServer* server, ClientSlot* slot )
+{
+    const int used_client_slots = get_used_client_slot_count(server);
+    const size_t size = sizeof(ServerLoginResponseMessage) +
+                        sizeof(ClientInfo) * used_client_slots;
+    const int flags = ENET_PACKET_FLAG_RELIABLE;
+    ENetPacket* packet = enet_packet_create(NULL, size, flags);
+    ServerLoginResponseMessage* login_response = (ServerLoginResponseMessage*)packet->data;
+
+    memset(login_response, 0, size);
+    login_response->header.type = SERVER_LOGIN_RESPONSE_MESSAGE;
+    if(!copy_string(server->name,
+                    login_response->server_name,
+                    sizeof(login_response->server_name)))
+        assert(!"Server name too long!");
+    login_response->client_slot_index = ENET_HOST_TO_NET_16(slot->index);
+    login_response->client_slot_count = ENET_HOST_TO_NET_16(server->client_slot_count);
+    login_response->used_client_slots = ENET_HOST_TO_NET_16(used_client_slots);
+
+    ClientInfo* client_info = (ClientInfo*)&login_response[1];
+    for(int i = 0; i < server->client_slot_count; i++)
+    {
+        ClientSlot* current_slot = &server->client_slots[i];
+        if(current_slot->state != CLIENT_SLOT_UNUSED)
+        {
+            client_info[i].slot_index = ENET_HOST_TO_NET_16(current_slot->index);
+            if(!copy_string(current_slot->name,
+                            client_info[i].name,
+                            sizeof(client_info[i].name)))
+                assert(!"Client name too long!");
+        }
+    }
+
+    const int message_channel = server->user_channel_count + MESSAGE_CHANNEL;
+    const int r = enet_peer_send(slot->peer, message_channel, packet);
+    assert(r == 0);
+}
+
 static void handle_login_request( ENetMpServer* server,
                                   ClientSlot* slot,
-                                  const ClientLoginRequestMessage* loginRequest )
+                                  const ClientLoginRequestMessage* login_request )
 {
     slot->reply_time = 0;
     slot->state = CLIENT_SLOT_ACTIVE;
-    bool r = copy_string(loginRequest->name, slot->name, sizeof(slot->name));
+    bool r = copy_string(login_request->name, slot->name, sizeof(slot->name));
     assert(r);
     server->callbacks.client_connected(server, slot->index);
+    send_login_response(server, slot);
 }
 
 static void handle_message( ENetMpServer* server,
@@ -221,9 +272,9 @@ static void handle_message( ENetMpServer* server,
     {
         case CLIENT_LOGIN_REQUEST_MESSAGE:
             assert(slot);
-            const ClientLoginRequestMessage* loginRequest =
+            const ClientLoginRequestMessage* login_request =
                 (const ClientLoginRequestMessage*)packet->data;
-            handle_login_request(server, slot, loginRequest);
+            handle_login_request(server, slot, login_request);
             break;
 
         default:

@@ -7,6 +7,7 @@
 
 typedef struct _ClientSlot
 {
+    int index;
     bool active;
     void* user_data;
     char name[MAX_NAME_SIZE];
@@ -22,6 +23,7 @@ struct _ENetMpClient
     int user_channel_count;
     char server_name[MAX_NAME_SIZE];
     ENetPeer* server_peer;
+    int slot_index;
     int client_slot_count;
     ClientSlot* client_slots;
 };
@@ -67,11 +69,11 @@ static void send_login_request( ENetMpClient* client )
     const size_t size = sizeof(ClientLoginRequestMessage);
     const int flags = ENET_PACKET_FLAG_RELIABLE;
     ENetPacket* packet = enet_packet_create(NULL, size, flags);
-    ClientLoginRequestMessage* loginRequest = (ClientLoginRequestMessage*)packet->data;
+    ClientLoginRequestMessage* login_request = (ClientLoginRequestMessage*)packet->data;
 
-    memset(loginRequest, 0, size);
-    loginRequest->header.type = CLIENT_LOGIN_REQUEST_MESSAGE;
-    if(!copy_string(client->name, loginRequest->name, sizeof(loginRequest->name)))
+    memset(login_request, 0, size);
+    login_request->header.type = CLIENT_LOGIN_REQUEST_MESSAGE;
+    if(!copy_string(client->name, login_request->name, sizeof(login_request->name)))
         assert(!"Name too long!");
 
     const int message_channel = client->user_channel_count + MESSAGE_CHANNEL;
@@ -97,6 +99,53 @@ static void handle_disconnect( void* context,
     client->callbacks.disconnected(client, reason);
 }
 
+static void handle_login_response( ENetMpClient* client,
+                                   const ServerLoginResponseMessage* login_response )
+{
+    bool r = copy_string(login_response->server_name,
+                         client->server_name,
+                         sizeof(client->server_name));
+    assert(r);
+
+    client->slot_index        = ENET_NET_TO_HOST_16(login_response->client_slot_index);
+    client->client_slot_count = ENET_NET_TO_HOST_16(login_response->client_slot_count);
+    client->client_slots = (ClientSlot*)calloc(client->client_slot_count,
+                                               sizeof(ClientSlot));
+    for(int i = 0; i < client->client_slot_count; i++)
+        client->client_slots[i].index = i;
+
+    const int used_client_slots = ENET_NET_TO_HOST_16(login_response->used_client_slots);
+    ClientInfo* client_info = (ClientInfo*)&login_response[1];
+    for(int i = 0; i < used_client_slots; i++)
+    {
+        ClientInfo* info = &client_info[i];
+        const int slot_index = ENET_NET_TO_HOST_16(info->slot_index);
+        ClientSlot* slot = &client->client_slots[slot_index];
+        slot->active = true;
+        if(!copy_string(info->name, slot->name, sizeof(slot->name)))
+            assert(!"Client name too long!");
+    }
+
+    client->callbacks.connected(client);
+}
+
+static void handle_message( ENetMpClient* client,
+                            const ENetPacket* packet )
+{
+    const MessageHeader* header = (const MessageHeader*)packet->data;
+    const MessageType message_type = (MessageType)header->type;
+    switch(message_type)
+    {
+        case SERVER_LOGIN_RESPONSE_MESSAGE:
+            handle_login_response(client,
+                                  (const ServerLoginResponseMessage*)packet->data);
+            break;
+
+        default:
+            assert(!"Unknown message type!");
+    }
+}
+
 static void handle_receive( void* context,
                             ENetPeer* peer,
                             int channel,
@@ -117,7 +166,7 @@ static void handle_receive( void* context,
         switch(internal_channel)
         {
             case MESSAGE_CHANNEL:
-                UNIMPLEMENTED();
+                handle_message(client, packet);
                 break;
 
             default:

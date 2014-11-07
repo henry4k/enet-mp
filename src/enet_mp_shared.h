@@ -55,6 +55,24 @@ typedef struct _ClientLoginRequestMessage
 
 } ClientLoginRequestMessage;
 
+typedef struct _ClientInfo
+{
+    enet_uint16 slot_index;
+    char name[MAX_NAME_SIZE];
+
+} ClientInfo;
+
+typedef struct _ServerLoginResponseMessage
+{
+    MessageHeader header;
+    char server_name[MAX_NAME_SIZE];
+    enet_uint16 client_slot_index;
+    enet_uint16 client_slot_count;
+    enet_uint16 used_client_slots;
+    // ClientInfo * used_client_slots
+
+} ServerLoginResponseMessage;
+
 
 bool copy_string( const char* source, char* destination, int destination_size );
 

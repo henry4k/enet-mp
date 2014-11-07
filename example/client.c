@@ -7,6 +7,24 @@ void stop()
     is_running = 0;
 }
 
+void print_clients( ENetMpClient* client )
+{
+    const int slot_count = enet_mp_client_get_client_slot_count(client);
+    printf("slot_count=%d\n", slot_count);
+    for(int i = 0; i < slot_count; i++)
+    {
+        printf("  slot=%d name=%s\n",
+               i,
+               enet_mp_client_get_client_name_at_slot(client, i));
+    }
+}
+
+void connected( ENetMpClient* client )
+{
+    printf("connected: server_name=%s", enet_mp_client_get_server_name(client));
+    print_clients(client);
+}
+
 void disconnected( ENetMpClient* client, ENetMpDisconnectReason reason )
 {
     printf("disconnected: reason=%s", disconnect_reason_to_string(reason));
@@ -52,6 +70,7 @@ int main()
     memset(&config, 0, sizeof(config));
     config.server_address = server_address;
     config.name = "example client";
+    config.callbacks.connected = connected;
     config.callbacks.disconnected = disconnected;
     config.callbacks.another_client_connected = another_client_connected;
     config.callbacks.another_client_disconnected = another_client_disconnected;

@@ -142,6 +142,11 @@ typedef struct _ENetMpClient ENetMpClient;
 typedef struct _ENetMpClientCallbacks
 {
     /**
+     * Callback which is triggered when the client connected to the server.
+     */
+    void (*connected)( ENetMpClient* client );
+
+    /**
      * Callback which is triggered when the client disconnected from the server.
      */
     void (*disconnected)( ENetMpClient* client, ENetMpDisconnectReason reason );
