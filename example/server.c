@@ -7,9 +7,9 @@ void stop()
     is_running = 0;
 }
 
-void client_connecting( ENetMpServer* server, int client_slot_index )
+void client_connected( ENetMpServer* server, int client_slot_index )
 {
-    printf("client_connecting: index=%d name=%s\n",
+    printf("client_connected: index=%d name=%s\n",
            client_slot_index,
            enet_mp_server_get_client_name_at_slot(server, client_slot_index));
 }
@@ -18,10 +18,10 @@ void client_disconnected( ENetMpServer* server,
                           int client_slot_index,
                           ENetMpDisconnectReason reason )
 {
-    printf("client_disconnected: index=%d name=%s reason=%d\n",
+    printf("client_disconnected: index=%d name=%s reason=%s\n",
            client_slot_index,
            enet_mp_server_get_client_name_at_slot(server, client_slot_index),
-           reason);
+           disconnect_reason_to_string(reason));
 }
 
 void client_sent_packet( ENetMpServer* server,
@@ -47,7 +47,7 @@ int main()
     config.address.port = PORT;
     config.max_clients = 32;
     config.name = "example server";
-    config.callbacks.client_connecting = client_connecting;
+    config.callbacks.client_connected = client_connected;
     config.callbacks.client_disconnected = client_disconnected;
     config.callbacks.client_sent_packet = client_sent_packet;
 

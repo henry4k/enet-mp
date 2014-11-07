@@ -56,7 +56,8 @@ typedef enum _ENetMpDisconnectReason
     ENET_MP_DISCONNECT_MANUAL,
     ENET_MP_DISCONNECT_SERVER_SHUTDOWN,
     ENET_MP_DISCONNECT_SERVER_FULL,
-    ENET_MP_DISCONNECT_REPLY_TIMEOUT,
+    ENET_MP_DISCONNECT_REPLY_TIMEOUT
+
 } ENetMpDisconnectReason;
 
 /**
@@ -69,11 +70,11 @@ typedef struct _ENetMpServer ENetMpServer;
 typedef struct _ENetMpServerCallbacks
 {
     /**
-     * Callback which is triggered when a client attempts to connect.
+     * Callback which is triggered when a client connected.
      *
      * Is not triggered when a clients tries connecting to a full server.
      */
-    void (*client_connecting)( ENetMpServer* server, int client_slot_index );
+    void (*client_connected)( ENetMpServer* server, int client_slot_index );
 
     /**
      * Callback which is triggered when a client disconnected.

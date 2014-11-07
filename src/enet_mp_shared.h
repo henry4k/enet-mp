@@ -42,26 +42,18 @@ typedef enum _MessageType
 
 } MessageType;
 
-typedef struct _ServerInformationMessage
+typedef struct _MessageHeader
 {
-    char name[MAX_NAME_SIZE];
-    int free_client_slots;
-    int used_client_slots;
+    enet_uint8 type;
 
-} ServerInformationMessage;
+} MessageHeader;
 
 typedef struct _ClientLoginRequestMessage
 {
+    MessageHeader header;
     char name[MAX_NAME_SIZE];
 
 } ClientLoginRequestMessage;
-
-typedef struct _ServerLoginResponseMessage
-{
-    char name[MAX_NAME_SIZE];
-    int max_clients;
-
-} ServerLoginResponseMessage;
 
 
 bool copy_string( const char* source, char* destination, int destination_size );
@@ -72,13 +64,5 @@ void host_service( ENetHost* host,
                    ConnectHandler connect_handler,
                    DisconnectHandler disconnect_handler,
                    ReceiveHandler receive_handler );
-
-/*
-bool read_message_packet( const ENetPacket* packet,
-                          MessageType* message_type,
-                          Message* message );
-
-ENetPacket* create_message_packet( MessageType type, const void* message );
-*/
 
 #endif

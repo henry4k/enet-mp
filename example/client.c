@@ -9,7 +9,7 @@ void stop()
 
 void disconnected( ENetMpClient* client, ENetMpDisconnectReason reason )
 {
-    printf("disconnected: reason=%d", reason);
+    printf("disconnected: reason=%s", disconnect_reason_to_string(reason));
     stop();
 }
 
@@ -24,10 +24,10 @@ void another_client_disconnected( ENetMpClient* client,
                                  int client_slot_index,
                                  ENetMpDisconnectReason reason )
 {
-    printf("remote_client_disconnected: index=%d name=%s reason=%d\n",
+    printf("remote_client_disconnected: index=%d name=%s reason=%s\n",
            client_slot_index,
            enet_mp_client_get_client_name_at_slot(client, client_slot_index),
-           reason);
+           disconnect_reason_to_string(reason));
 }
 
 void received_packet( ENetMpClient* client,

@@ -8,12 +8,15 @@
 typedef enum _ClientSlotState
 {
     CLIENT_SLOT_UNUSED,
-    CLIENT_SLOT_CONNECTED
-    // ...
+    CLIENT_SLOT_CONNECTING, // Client connected, but is not ready to participate yet.
+    CLIENT_SLOT_ACTIVE,
+    CLIENT_SLOT_DISCONNECTED // Client just disconnected. (Used for the callback.)
+
 } ClientSlotState;
 
 typedef struct _ClientSlot
 {
+    int index;
     ClientSlotState state;
     void* user_data;
     char name[MAX_NAME_SIZE];
@@ -57,6 +60,9 @@ ENetMpServer* enet_mp_server_create( const ENetMpServerConfiguration* config )
     assert(server->host);
     server->client_slots = (ClientSlot*)calloc(server->client_slot_count,
                                                sizeof(ClientSlot));
+    for(int i = 0; i < server->client_slot_count; i++)
+        server->client_slots[i].index = i;
+
     server->reply_timeout = 1000;
 
     return server;
@@ -66,6 +72,7 @@ static void disconnect_client_later( ENetMpServer* server, ClientSlot* slot, int
 {
     assert(slot->state != CLIENT_SLOT_UNUSED);
     enet_peer_disconnect_later(slot->peer, reason);
+    slot->state = CLIENT_SLOT_DISCONNECTED;
 }
 
 static void disconnect_client_now( ENetMpServer* server, ClientSlot* slot, int reason )
@@ -112,7 +119,7 @@ static void handle_new_client( ENetMpServer* server, ENetPeer* peer )
     if(slot)
     {
         memset(slot, 0, sizeof(ClientSlot));
-        slot->state = CLIENT_SLOT_CONNECTED;
+        slot->state = CLIENT_SLOT_CONNECTING;
         slot->peer = peer;
         slot->reply_time = enet_time_get() + server->reply_timeout;
     }
@@ -129,7 +136,7 @@ static void handle_unknown_connection( const ENetMpServer* server, ENetPeer* pee
     assert(!"Unknown connection type!");
 }
 
-static int find_client_slot_by_peer( const ENetMpServer* server, const ENetPeer* peer )
+static ClientSlot* find_client_slot_by_peer( const ENetMpServer* server, const ENetPeer* peer )
 {
     for(int i = 0; i < server->client_slot_count; i++)
     {
@@ -137,10 +144,22 @@ static int find_client_slot_by_peer( const ENetMpServer* server, const ENetPeer*
         if(slot->peer == peer)
         {
             assert(slot->state != CLIENT_SLOT_UNUSED);
-            return i;
+            return slot;
         }
     }
-    return -1;
+    return NULL;
+}
+
+static ClientSlot* get_client_slot( ENetMpServer* server, int index )
+{
+    assert(index >= 0);
+    if(index < server->client_slot_count)
+    {
+        ClientSlot* slot = &server->client_slots[index];
+        if(slot->state != CLIENT_SLOT_UNUSED)
+            return slot;
+    }
+    return NULL;
 }
 
 static void handle_connect( void* context,
@@ -170,12 +189,43 @@ static void handle_disconnect( void* context,
 {
     ENetMpServer* server = (ENetMpServer*)context;
 
-    const int slot_index = find_client_slot_by_peer(server, peer);
-    if(slot_index >= 0)
+    ClientSlot* slot = find_client_slot_by_peer(server, peer);
+    if(slot)
     {
-        ClientSlot* slot = &server->client_slots[slot_index];
+        slot->state = CLIENT_SLOT_DISCONNECTED;
+        server->callbacks.client_disconnected(server, slot->index, reason);
         slot->state = CLIENT_SLOT_UNUSED;
-        server->callbacks.client_disconnected(server, slot_index, reason);
+    }
+}
+
+static void handle_login_request( ENetMpServer* server,
+                                  ClientSlot* slot,
+                                  const ClientLoginRequestMessage* loginRequest )
+{
+    slot->reply_time = 0;
+    slot->state = CLIENT_SLOT_ACTIVE;
+    bool r = copy_string(loginRequest->name, slot->name, sizeof(slot->name));
+    assert(r);
+    server->callbacks.client_connected(server, slot->index);
+}
+
+static void handle_message( ENetMpServer* server,
+                            ClientSlot* slot,
+                            const ENetPacket* packet )
+{
+    const MessageHeader* header = (const MessageHeader*)packet->data;
+    const MessageType message_type = (MessageType)header->type;
+    switch(message_type)
+    {
+        case CLIENT_LOGIN_REQUEST_MESSAGE:
+            assert(slot);
+            const ClientLoginRequestMessage* loginRequest =
+                (const ClientLoginRequestMessage*)packet->data;
+            handle_login_request(server, slot, loginRequest);
+            break;
+
+        default:
+            assert(!"Unknown message type!");
     }
 }
 
@@ -185,13 +235,13 @@ static void handle_receive( void* context,
                             const ENetPacket* packet )
 {
     ENetMpServer* server = (ENetMpServer*)context;
-    const int slot_index = find_client_slot_by_peer(server, peer);
+    ClientSlot* slot = find_client_slot_by_peer(server, peer);
 
     const int user_channel_count = server->user_channel_count;
     if(channel < user_channel_count)
     {
-        assert(slot_index >= 0);
-        server->callbacks.client_sent_packet(server, slot_index, channel, packet);
+        assert(slot);
+        server->callbacks.client_sent_packet(server, slot->index, channel, packet);
     }
     else
     {
@@ -201,7 +251,7 @@ static void handle_receive( void* context,
         switch(internal_channel)
         {
             case MESSAGE_CHANNEL:
-                UNIMPLEMENTED();
+                handle_message(server, slot, packet);
                 break;
 
             default:
@@ -245,18 +295,6 @@ ENetHost* enet_mp_server_get_host( ENetMpServer* server )
 int enet_mp_server_get_client_slot_count( ENetMpServer* server )
 {
     return server->client_slot_count;
-}
-
-static ClientSlot* get_client_slot( ENetMpServer* server, int index )
-{
-    assert(index >= 0);
-    if(index < server->client_slot_count)
-    {
-        ClientSlot* slot = &server->client_slots[index];
-        if(slot->state != CLIENT_SLOT_UNUSED)
-            return slot;
-    }
-    return NULL;
 }
 
 const char* enet_mp_server_get_client_name_at_slot( ENetMpServer* server, int index )

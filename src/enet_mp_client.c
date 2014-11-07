@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdlib.h> // calloc, free
+#include <string.h> // memset
 #include "enet_mp.h"
 #include "enet_mp_shared.h"
 
@@ -61,12 +62,30 @@ void enet_mp_client_destroy( ENetMpClient* client )
     free(client);
 }
 
+static void send_login_request( ENetMpClient* client )
+{
+    const size_t size = sizeof(ClientLoginRequestMessage);
+    const int flags = ENET_PACKET_FLAG_RELIABLE;
+    ENetPacket* packet = enet_packet_create(NULL, size, flags);
+    ClientLoginRequestMessage* loginRequest = (ClientLoginRequestMessage*)packet->data;
+
+    memset(loginRequest, 0, size);
+    loginRequest->header.type = CLIENT_LOGIN_REQUEST_MESSAGE;
+    if(!copy_string(client->name, loginRequest->name, sizeof(loginRequest->name)))
+        assert(!"Name too long!");
+
+    const int message_channel = client->user_channel_count + MESSAGE_CHANNEL;
+    const int r = enet_peer_send(client->server_peer, message_channel, packet);
+    assert(r == 0);
+}
+
 static void handle_connect( void* context,
                             ENetPeer* peer,
                             ConnectionType connection_type )
 {
     ENetMpClient* client = (ENetMpClient*)context;
     assert(peer == client->server_peer);
+    send_login_request(client);
 }
 
 static void handle_disconnect( void* context,
