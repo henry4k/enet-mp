@@ -12,4 +12,4 @@ It manages client connections, provides synced variables and is non-obstrubtive.
 Copyright © Henry Kielmann
 
 ENet Mp is licensed under the MIT license, which can be found in the
-`LICENCE` file.
+`LICENSE` file.
