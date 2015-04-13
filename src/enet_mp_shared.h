@@ -7,8 +7,6 @@
 
 #define UNIMPLEMENTED() assert(!"UNIMPLEMENTED!")
 
-static const int MAX_NAME_SIZE = 64;
-
 typedef enum _ConnectionType
 {
     QUERY_CONNECTION,
@@ -37,34 +35,43 @@ typedef void (*ReceiveHandler)( void* context,
 typedef enum _MessageType
 {
     SERVER_INFORMATION_MESSAGE,
-    CLIENT_LOGIN_REQUEST_MESSAGE,
-    SERVER_LOGIN_RESPONSE_MESSAGE
+    CLIENT_AUTH_REQUEST_MESSAGE,
+    SERVER_CLIENT_ACTIVATION_MESSAGE
 
 } MessageType;
 
+typedef struct _MessageHeader
+{
+    enet_uint8 type;
+
+} MessageHeader;
+
 typedef struct _ServerInformationMessage
 {
-    char name[MAX_NAME_SIZE];
-    int free_client_slots;
-    int used_client_slots;
+    enet_uint8 free_client_slots;
+    enet_uint8 used_client_slots;
 
 } ServerInformationMessage;
 
-typedef struct _ClientLoginRequestMessage
+typedef struct _ClientAuthRequestHeader
 {
-    char name[MAX_NAME_SIZE];
+    enet_uint8 debug_padding; // TODO: Remove this later on.
 
-} ClientLoginRequestMessage;
+} ClientAuthRequestHeader;
 
-typedef struct _ServerLoginResponseMessage
+typedef struct _ServerAuthResponseMessage
 {
-    char name[MAX_NAME_SIZE];
-    int max_clients;
+    enet_uint8 max_clients;
 
-} ServerLoginResponseMessage;
+} ServerAuthResponseMessage;
 
 
+// TODO: Remove copy_string as its not used anymore.
 bool copy_string( const char* source, char* destination, int destination_size );
+
+bool is_in_bounds( int index, int array_size );
+
+const char* disconnect_reason_as_string( ENetMpDisconnectReason reason );
 
 void host_service( ENetHost* host,
                    int timeout,
@@ -73,12 +80,16 @@ void host_service( ENetHost* host,
                    DisconnectHandler disconnect_handler,
                    ReceiveHandler receive_handler );
 
-/*
-bool read_message_packet( const ENetPacket* packet,
-                          MessageType* message_type,
-                          Message* message );
+enet_uint8 get_internal_channel( InternalChannel channel, int user_channel_count );
 
-ENetPacket* create_message_packet( MessageType type, const void* message );
-*/
+char* send_internal_message( ENetPeer* peer,
+                             MessageType type,
+                             int size,
+                             int user_channel_count );
+
+const char* read_internal_message( const ENetPacket* packet,
+                                   MessageType* type,
+                                   int* size );
+
 
 #endif

@@ -19,6 +19,25 @@ bool copy_string( const char* source, char* destination, int destination_size )
     }
 }
 
+bool is_in_bounds( int index, int array_size )
+{
+    return index >= 0 &&
+           index < array_size;
+}
+
+const char* disconnect_reason_as_string( ENetMpDisconnectReason reason )
+{
+    switch(reason)
+    {
+        case ENET_MP_DISCONNECT_UNKNOWN: return "unknown";
+        case ENET_MP_DISCONNECT_MANUAL: return "manual";
+        case ENET_MP_DISCONNECT_SERVER_SHUTDOWN: return "server shutdown";
+        case ENET_MP_DISCONNECT_SERVER_FULL: return "server is full";
+        case ENET_MP_DISCONNECT_REPLY_TIMEOUT: return "reply timeout";
+        default: assert(!"Unknown reason!");
+    }
+}
+
 void host_service( ENetHost* host,
                    int timeout,
                    void* context,
@@ -61,4 +80,41 @@ void host_service( ENetHost* host,
         }
     }
     // TODO: Maybe use enet_host_check_events and enet_host_flush instead.
+}
+
+enet_uint8 get_internal_channel( InternalChannel channel, int user_channel_count )
+{
+    return (enet_uint8)(user_channel_count + (int)channel);
+}
+
+char* send_internal_message( ENetPeer* peer,
+                             MessageType type,
+                             int size,
+                             int user_channel_count )
+{
+    const int packet_size = sizeof(MessageHeader) + size;
+    ENetPacket* packet = enet_packet_create(NULL,
+                                            packet_size,
+                                            ENET_PACKET_FLAG_RELIABLE);
+
+    const enet_uint8 channel = get_internal_channel(MESSAGE_CHANNEL, user_channel_count);
+    const int result = enet_peer_send(peer, channel, packet);
+    assert(result == 0);
+
+    MessageHeader* header = (MessageHeader*)packet->data;
+    header->type = type;
+
+    char* data = &packet->data[sizeof(MessageHeader)];
+    memset(data, 0, size);
+    return data;
+}
+
+const char* read_internal_message( const ENetPacket* packet,
+                                   MessageType* type,
+                                   int* size )
+{
+    const MessageHeader* header = (const MessageHeader*)packet->data;
+    *type = header->type;
+    *size = packet->dataLength - sizeof(MessageHeader);
+    return &packet->data[sizeof(MessageHeader)];
 }

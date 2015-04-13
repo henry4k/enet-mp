@@ -56,7 +56,7 @@ typedef enum _ENetMpDisconnectReason
     ENET_MP_DISCONNECT_MANUAL,
     ENET_MP_DISCONNECT_SERVER_SHUTDOWN,
     ENET_MP_DISCONNECT_SERVER_FULL,
-    ENET_MP_DISCONNECT_REPLY_TIMEOUT,
+    ENET_MP_DISCONNECT_REPLY_TIMEOUT
 } ENetMpDisconnectReason;
 
 /**
@@ -72,8 +72,15 @@ typedef struct _ENetMpServerCallbacks
      * Callback which is triggered when a client attempts to connect.
      *
      * Is not triggered when a clients tries connecting to a full server.
+     *
+     * @param auth_data
+     * Contains the data which was set by the client using
+     * #enet_mp_client_set_auth_data or `NULL`.
      */
-    void (*client_connecting)( ENetMpServer* server, int client_slot_index );
+    void (*client_connecting)( ENetMpServer* server,
+                               int client_slot_index,
+                               const void* auth_data,
+                               int auth_data_size );
 
     /**
      * Callback which is triggered when a client disconnected.
@@ -122,11 +129,6 @@ typedef struct _ENetMpServerConfiguration
      */
     int max_clients;
 
-    /**
-     * Server name that is visible to the clients.
-     */
-    const char* name;
-
     ENetMpServerCallbacks callbacks;
 
 } ENetMpServerConfiguration;
@@ -157,6 +159,7 @@ typedef struct _ENetMpClientCallbacks
      * Callback which is triggered when another client connected to the server.
      */
     void (*another_client_connected)( ENetMpClient* client, int client_slot_index );
+    // TODO: Allow user data!
 
     /**
      * Callback which is triggered when another client disconnected.
@@ -188,9 +191,10 @@ typedef struct _ENetMpClientConfiguration
     int channel_count;
 
     /**
-     * Client name that is visible to the server and other clients.
+     * Authentication information sent to the server.
      */
-    const char* name;
+    const void* auth_data;
+    int auth_data_size;
 
     ENetMpClientCallbacks callbacks;
 
@@ -228,8 +232,6 @@ ENET_MP_API ENetHost* enet_mp_server_get_host( ENetMpServer* server );
 
 ENET_MP_API int enet_mp_server_get_client_slot_count( ENetMpServer* server );
 
-ENET_MP_API const char* enet_mp_server_get_client_name_at_slot( ENetMpServer* server, int index );
-
 ENET_MP_API ENetPeer* enet_mp_server_get_client_peer_at_slot( ENetMpServer* server, int index );
 
 
@@ -262,13 +264,9 @@ ENET_MP_API void* enet_mp_client_get_user_data( ENetMpClient* client );
 
 ENET_MP_API ENetHost* enet_mp_client_get_host( ENetMpClient* client );
 
-ENET_MP_API const char* enet_mp_client_get_server_name( ENetMpClient* client );
-
 ENET_MP_API ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client );
 
 ENET_MP_API int enet_mp_client_get_client_slot_count( ENetMpClient* client );
-
-ENET_MP_API const char* enet_mp_client_get_client_name_at_slot( ENetMpClient* client, int index );
 
 
 #ifdef __cplusplus
