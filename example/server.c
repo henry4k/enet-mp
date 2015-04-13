@@ -7,20 +7,21 @@ void stop()
     is_running = 0;
 }
 
-void client_connecting( ENetMpServer* server, int client_slot_index )
+void client_connecting( ENetMpServer* server,
+                        int client_slot_index,
+                        const void* auth_data,
+                        int auth_data_size )
 {
     printf("client_connecting: index=%d name=%s\n",
-           client_slot_index,
-           enet_mp_server_get_client_name_at_slot(server, client_slot_index));
+           client_slot_index, (const char*)auth_data);
 }
 
 void client_disconnected( ENetMpServer* server,
                           int client_slot_index,
                           ENetMpDisconnectReason reason )
 {
-    printf("client_disconnected: index=%d name=%s reason=%d\n",
+    printf("client_disconnected: index=%d reason=%d\n",
            client_slot_index,
-           enet_mp_server_get_client_name_at_slot(server, client_slot_index),
            reason);
 }
 
@@ -29,9 +30,8 @@ void client_sent_packet( ENetMpServer* server,
                          int channel,
                          const ENetPacket* packet )
 {
-    printf("client_sent_packet: index=%d name=%s channel=%d packet=%s",
+    printf("client_sent_packet: index=%d channel=%d packet=%s",
            client_slot_index,
-           enet_mp_server_get_client_name_at_slot(server, client_slot_index),
            channel,
            packet->data);
 }
@@ -46,7 +46,6 @@ int main()
     config.address.host = ENET_HOST_ANY;
     config.address.port = PORT;
     config.max_clients = 32;
-    config.name = "example server";
     config.callbacks.client_connecting = client_connecting;
     config.callbacks.client_disconnected = client_disconnected;
     config.callbacks.client_sent_packet = client_sent_packet;

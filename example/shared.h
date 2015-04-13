@@ -3,7 +3,7 @@
 
 #include <assert.h>
 #include <stdio.h> // printf, fflush
-#include <string.h> // memset
+#include <string.h> // memset, strlen
 #include <stdlib.h> // atexit
 #include <signal.h>
 #include <enet/enet.h>

@@ -15,18 +15,16 @@ void disconnected( ENetMpClient* client, ENetMpDisconnectReason reason )
 
 void another_client_connected( ENetMpClient* client, int client_slot_index )
 {
-    printf("remote_client_connected: index=%d name=%s\n",
-           client_slot_index,
-           enet_mp_client_get_client_name_at_slot(client, client_slot_index));
+    printf("remote_client_connected: index=%d\n",
+           client_slot_index);
 }
 
 void another_client_disconnected( ENetMpClient* client,
                                  int client_slot_index,
                                  ENetMpDisconnectReason reason )
 {
-    printf("remote_client_disconnected: index=%d name=%s reason=%d\n",
+    printf("remote_client_disconnected: index=%d reason=%d\n",
            client_slot_index,
-           enet_mp_client_get_client_name_at_slot(client, client_slot_index),
            reason);
 }
 
@@ -39,7 +37,7 @@ void received_packet( ENetMpClient* client,
            packet->data);
 }
 
-int main()
+int main( int argc, char** argv )
 {
     assert(enet_initialize() == 0);
     atexit(enet_deinitialize);
@@ -51,7 +49,15 @@ int main()
     ENetMpClientConfiguration config;
     memset(&config, 0, sizeof(config));
     config.server_address = server_address;
-    config.name = "example client";
+
+    const char* name = NULL;
+    if(argc >= 2)
+        name = argv[1];
+    else
+        name = "unknown";
+    config.auth_data = name;
+    config.auth_data_size = strlen(name)+1;
+
     config.callbacks.disconnected = disconnected;
     config.callbacks.another_client_connected = another_client_connected;
     config.callbacks.another_client_disconnected = another_client_disconnected;
