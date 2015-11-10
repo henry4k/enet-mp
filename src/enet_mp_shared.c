@@ -31,6 +31,7 @@ const char* disconnect_reason_as_string( ENetMpDisconnectReason reason )
     {
         case ENET_MP_DISCONNECT_UNKNOWN: return "unknown";
         case ENET_MP_DISCONNECT_MANUAL: return "manual";
+        case ENET_MP_DISCONNECT_AUTH_FAILURE: return "authentication failure";
         case ENET_MP_DISCONNECT_SERVER_SHUTDOWN: return "server shutdown";
         case ENET_MP_DISCONNECT_SERVER_FULL: return "server is full";
         case ENET_MP_DISCONNECT_REPLY_TIMEOUT: return "reply timeout";

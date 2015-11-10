@@ -54,6 +54,7 @@ typedef enum _ENetMpDisconnectReason
 {
     ENET_MP_DISCONNECT_UNKNOWN,
     ENET_MP_DISCONNECT_MANUAL,
+    ENET_MP_DISCONNECT_AUTH_FAILURE,
     ENET_MP_DISCONNECT_SERVER_SHUTDOWN,
     ENET_MP_DISCONNECT_SERVER_FULL,
     ENET_MP_DISCONNECT_REPLY_TIMEOUT
@@ -73,9 +74,11 @@ typedef struct _ENetMpServerCallbacks
      *
      * Is not triggered when a clients tries connecting to a full server.
      *
+     * TODO: If authentication fails, the callback has to disconnect the client.
+     *
      * @param auth_data
-     * Contains the data which was set by the client using
-     * #enet_mp_client_set_auth_data or `NULL`.
+     * Contains the data which was set by the client in its
+     * #ENetMpClientConfiguration or `NULL`.
      */
     void (*client_connecting)( ENetMpServer* server,
                                int client_slot_index,
@@ -154,19 +157,6 @@ typedef struct _ENetMpClientCallbacks
      * yourself.
      */
     void (*received_packet)( ENetMpClient* client, int channel, const ENetPacket* packet );
-
-    /**
-     * Callback which is triggered when another client connected to the server.
-     */
-    void (*another_client_connected)( ENetMpClient* client, int client_slot_index );
-    // TODO: Allow user data!
-
-    /**
-     * Callback which is triggered when another client disconnected.
-     */
-    void (*another_client_disconnected)( ENetMpClient* client,
-                                         int client_slot_index,
-                                         ENetMpDisconnectReason reason );
 
 } ENetMpClientCallbacks;
 
@@ -265,8 +255,6 @@ ENET_MP_API void* enet_mp_client_get_user_data( ENetMpClient* client );
 ENET_MP_API ENetHost* enet_mp_client_get_host( ENetMpClient* client );
 
 ENET_MP_API ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client );
-
-ENET_MP_API int enet_mp_client_get_client_slot_count( ENetMpClient* client );
 
 
 #ifdef __cplusplus

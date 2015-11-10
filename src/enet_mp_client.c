@@ -19,8 +19,6 @@ struct _ENetMpClient
     ENetHost* host;
     int user_channel_count;
     ENetPeer* server_peer;
-    int client_slot_count;
-    ClientSlot* client_slots;
 
     char* auth_data;
     int auth_data_size;
@@ -71,7 +69,6 @@ void enet_mp_client_destroy( ENetMpClient* client )
 {
     enet_peer_disconnect_now(client->server_peer, ENET_MP_DISCONNECT_MANUAL);
     enet_host_destroy(client->host);
-    free(client->client_slots);
     if(client->auth_data)
         free(client->auth_data);
     free(client);
@@ -192,21 +189,4 @@ ENetHost* enet_mp_client_get_host( ENetMpClient* client )
 ENetPeer* enet_mp_client_get_server_peer( ENetMpClient* client )
 {
     return client->server_peer;
-}
-
-int enet_mp_client_get_client_slot_count( ENetMpClient* client )
-{
-    return client->client_slot_count;
-}
-
-static ClientSlot* get_client_slot( ENetMpClient* client, int index )
-{
-    assert(index >= 0);
-    if(index < client->client_slot_count)
-    {
-        ClientSlot* slot = &client->client_slots[index];
-        if(slot->active)
-            return slot;
-    }
-    return NULL;
 }

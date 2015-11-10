@@ -12,15 +12,20 @@ void client_connecting( ENetMpServer* server,
                         const void* auth_data,
                         int auth_data_size )
 {
-    printf("client_connecting: index=%d name=%s\n",
+    printf("\nclient_connecting: index=%d name=%s\n",
            client_slot_index, (const char*)auth_data);
+    if(!auth_data)
+    {
+        ENetPeer* peer = enet_mp_server_get_client_peer_at_slot(server, client_slot_index);
+        enet_peer_disconnect_later(peer, (int)ENET_MP_DISCONNECT_AUTH_FAILURE);
+    }
 }
 
 void client_disconnected( ENetMpServer* server,
                           int client_slot_index,
                           ENetMpDisconnectReason reason )
 {
-    printf("client_disconnected: index=%d reason=%d\n",
+    printf("\nclient_disconnected: index=%d reason=%d\n",
            client_slot_index,
            reason);
 }
@@ -30,7 +35,7 @@ void client_sent_packet( ENetMpServer* server,
                          int channel,
                          const ENetPacket* packet )
 {
-    printf("client_sent_packet: index=%d channel=%d packet=%s",
+    printf("\nclient_sent_packet: index=%d channel=%d packet=%s\n",
            client_slot_index,
            channel,
            packet->data);
