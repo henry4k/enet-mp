@@ -74,14 +74,15 @@ typedef struct _ENetMpServerCallbacks
      *
      * Is not triggered when a clients tries connecting to a full server.
      *
-     * TODO: If authentication fails, the callback has to disconnect the client.
+     * If e.g. the authentication failed use #enet_mp_server_disconnect_client
+     * with #ENET_MP_DISCONNECT_AUTH_FAILURE.
      *
      * @param auth_data
      * Contains the data which was set by the client in its
      * #ENetMpClientConfiguration or `NULL`.
      */
     void (*client_connecting)( ENetMpServer* server,
-                               int client_slot_index,
+                               int client_slot,
                                const void* auth_data,
                                int auth_data_size );
 
@@ -89,7 +90,7 @@ typedef struct _ENetMpServerCallbacks
      * Callback which is triggered when a client disconnected.
      */
     void (*client_disconnected)( ENetMpServer* server,
-                                 int client_slot_index,
+                                 int client_slot,
                                  ENetMpDisconnectReason reason );
 
     /**
@@ -99,7 +100,7 @@ typedef struct _ENetMpServerCallbacks
      * yourself.
      */
     void (*client_sent_packet)( ENetMpServer* server,
-                                int client_slot_index,
+                                int client_slot,
                                 int channel,
                                 const ENetPacket* packet );
 
@@ -222,7 +223,15 @@ ENET_MP_API ENetHost* enet_mp_server_get_host( ENetMpServer* server );
 
 ENET_MP_API int enet_mp_server_get_client_slot_count( ENetMpServer* server );
 
-ENET_MP_API ENetPeer* enet_mp_server_get_client_peer_at_slot( ENetMpServer* server, int index );
+ENET_MP_API ENetPeer* enet_mp_server_get_client_peer( ENetMpServer* server,
+                                                      int client_slot );
+
+/**
+ * Immediately disconnect a client with the given reason.
+ */
+ENET_MP_API void enet_mp_server_disconnect_client( ENetMpServer* server,
+                                                   int client_slot,
+                                                   ENetMpDisconnectReason reason );
 
 
 /* ---- Client ---- */

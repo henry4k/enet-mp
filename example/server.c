@@ -1,3 +1,4 @@
+#include <string.h> // strcmp
 #include "shared.h"
 
 int is_running = 1;
@@ -8,35 +9,32 @@ void stop()
 }
 
 void client_connecting( ENetMpServer* server,
-                        int client_slot_index,
+                        int client_slot,
                         const void* auth_data,
                         int auth_data_size )
 {
-    printf("\nclient_connecting: index=%d name=%s\n",
-           client_slot_index, (const char*)auth_data);
-    if(!auth_data)
-    {
-        ENetPeer* peer = enet_mp_server_get_client_peer_at_slot(server, client_slot_index);
-        enet_peer_disconnect_later(peer, (int)ENET_MP_DISCONNECT_AUTH_FAILURE);
-    }
+    const char* name = (const char*)auth_data;
+    printf("\nclient_connecting: slot=%d name=%s\n", client_slot, name);
+    if(!name || strncmp("NOPE", name, auth_data_size) == 0)
+        enet_mp_server_disconnect_client(server, client_slot, ENET_MP_DISCONNECT_AUTH_FAILURE);
 }
 
 void client_disconnected( ENetMpServer* server,
-                          int client_slot_index,
+                          int client_slot,
                           ENetMpDisconnectReason reason )
 {
-    printf("\nclient_disconnected: index=%d reason=%d\n",
-           client_slot_index,
+    printf("\nclient_disconnected: slot=%d reason=%d\n",
+           client_slot,
            reason);
 }
 
 void client_sent_packet( ENetMpServer* server,
-                         int client_slot_index,
+                         int client_slot,
                          int channel,
                          const ENetPacket* packet )
 {
-    printf("\nclient_sent_packet: index=%d channel=%d packet=%s\n",
-           client_slot_index,
+    printf("\nclient_sent_packet: slot=%d channel=%d packet=%s\n",
+           client_slot,
            channel,
            packet->data);
 }

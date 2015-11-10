@@ -195,13 +195,13 @@ static void handle_disconnect( void* context,
 }
 
 static void handle_auth_request( ENetMpServer* server,
-                                 int client_slot_index,
+                                 int client_slot,
                                  const char* data,
                                  int size )
 {
-    assert(is_in_bounds(client_slot_index, server->client_slot_count));
-    ClientSlot* client_slot = &server->client_slots[client_slot_index];
-    assert(client_slot->state == CLIENT_SLOT_UNAUTHENTICATED);
+    assert(is_in_bounds(client_slot, server->client_slot_count));
+    ClientSlot* slot = &server->client_slots[client_slot];
+    assert(slot->state == CLIENT_SLOT_UNAUTHENTICATED);
 
     const ClientAuthRequestHeader* header = (const ClientAuthRequestHeader*)data;
     const char* auth_data = &data[sizeof(ClientAuthRequestHeader)];
@@ -211,21 +211,21 @@ static void handle_auth_request( ENetMpServer* server,
         auth_data = NULL;
 
     server->callbacks.client_connecting(server,
-                                        client_slot_index,
+                                        client_slot,
                                         auth_data,
                                         auth_data_size);
 
     // client_connecting callback could have disconnected the client
-    if(client_slot->state == CLIENT_SLOT_UNAUTHENTICATED)
+    if(slot->state == CLIENT_SLOT_UNAUTHENTICATED)
     {
-        client_slot->state = CLIENT_SLOT_ACTIVE;
-        client_slot->reply_time = 0;
+        slot->state = CLIENT_SLOT_ACTIVE;
+        slot->reply_time = 0;
     }
 }
 
 static void handle_internal_message( ENetMpServer* server,
                                      const ENetPacket* packet,
-                                     int client_slot_index )
+                                     int client_slot )
 {
     MessageType type;
     int size;
@@ -234,7 +234,7 @@ static void handle_internal_message( ENetMpServer* server,
     switch(type)
     {
         case CLIENT_AUTH_REQUEST_MESSAGE:
-            handle_auth_request(server, client_slot_index, data, size);
+            handle_auth_request(server, client_slot, data, size);
             break;
 
         default:
@@ -248,13 +248,13 @@ static void handle_receive( void* context,
                             const ENetPacket* packet )
 {
     ENetMpServer* server = (ENetMpServer*)context;
-    const int slot_index = find_client_slot_by_peer(server, peer);
+    const int client_slot = find_client_slot_by_peer(server, peer);
 
     const int user_channel_count = server->user_channel_count;
     if(channel < user_channel_count)
     {
-        assert(slot_index >= 0);
-        server->callbacks.client_sent_packet(server, slot_index, channel, packet);
+        assert(client_slot >= 0);
+        server->callbacks.client_sent_packet(server, client_slot, channel, packet);
     }
     else
     {
@@ -264,7 +264,7 @@ static void handle_receive( void* context,
         switch(internal_channel)
         {
             case MESSAGE_CHANNEL:
-                handle_internal_message(server, packet, slot_index);
+                handle_internal_message(server, packet, client_slot);
                 break;
 
             default:
@@ -323,11 +323,21 @@ static ClientSlot* get_client_slot( ENetMpServer* server, int index )
     return NULL;
 }
 
-ENetPeer* enet_mp_server_get_client_peer_at_slot( ENetMpServer* server, int index )
+ENetPeer* enet_mp_server_get_client_peer( ENetMpServer* server,
+                                          int client_slot )
 {
-    const ClientSlot* slot = get_client_slot(server, index);
+    const ClientSlot* slot = get_client_slot(server, client_slot);
     if(slot)
         return slot->peer;
     else
         return NULL;
+}
+
+void enet_mp_server_disconnect_client( ENetMpServer* server,
+                                       int client_slot,
+                                       ENetMpDisconnectReason reason )
+{
+    ClientSlot* slot = get_client_slot(server, client_slot);
+    if(slot)
+        disconnect_client_now(server, slot, reason);
 }
